@@ -1,63 +1,53 @@
-# [Názov tvojho Skillu]
+# Moje AI skilly
 
-[![OpenCode Skill](https://img.shields.io/badge/OpenCode-Skill-blue)](https://opencode.ai)
 
-[Stručný popis jedným vetou: Čo tento skill robí a aký problém rieši?]
 
-## 📋 Popis
-Detailnejší popis funkcií tvojho skillu. Napríklad:
-*   Integruje [názov služby] do OpenCode.
-*   Umožňuje používateľom automatizovať [konkrétnu úlohu].
-*   Poskytuje real-time dáta o [niečom].
+NÁVOD NA INŠTALÁCIU SKILLU DO OPENCODE.AI
 
-## 🚀 Inštalácia
+Tento návod predpokladá, že už máte nainštalované základné prostredie OpenCode a vytvoreného alebo stiahnutého agenta.
 
-Pre lokálny vývoj alebo manuálne pridanie skillu postupuj nasledovne:
+1. VÝBER A STIAHNUTIE SKILLU
+Skilly pre OpenCode sú zvyčajne dostupné v oficiálnom repozitári alebo na GitHube.
+- Nájdite URL adresu repozitára skillu (napr. https://github.com/opencode-ai/skill-weather).
+- Otvorte si terminál v priečinku, kde máte uložené svoje prostredie OpenCode.
 
-1.  Klonuj repozitár:
-    ```bash
-    git clone https://github.com/tvoje-meno/tvoj-repozitar.git
-    cd tvoj-repozitar
-    ```
+2. INŠTALÁCIA POMOCOU CLI
+Najjednoduchší spôsob je použiť priamo príkazovú riadku OpenCode:
 
-2.  Nainštaluj závislosti:
-    ```bash
-    npm install
-    ```
-    *(alebo `pip install -r requirements.txt` ak používaš Python)*
+Príkaz: opencode install skill [URL_ADRESA_SKILLU]
+Príklad: opencode install skill https://github.com/opencode-ai/skill-weather
 
-## ⚙️ Konfigurácia
+3. MANUÁLNA INŠTALÁCIA (ak CLI nefunguje)
+- Vstúpte do priečinka 'skills' vo vašom projekte: cd my-agent/skills
+- Klonujte repozitár skillu: git clone https://github.com/opencode-ai/skill-weather.git
+- Inštalácia závislostí: 
+  cd skill-weather
+  pip install -r requirements.txt
+  (alebo npm install pri JS skilloch)
 
-Tento skill vyžaduje nasledujúce premenné prostredia (v súbore `.env` alebo v nastaveniach OpenCode):
+4. KONFIGURÁCIA SKILLU
+- Skontrolujte súbor config.yaml alebo .env v priečinku skillu.
+- Ak existuje .env.example, premenujte ho na .env a doplňte svoje API kľúče.
 
-| Premenná | Popis | Povinné |
-| :--- | :--- | :--- |
-| `API_KEY` | Tvoj kľúč k externému API | Áno |
-| `LANGUAGE` | Predvolený jazyk (napr. `sk`) | Nie |
+5. AKTIVÁCIA V AGENTOVI
+V hlavnom konfiguračnom súbore agenta (agent.yaml alebo settings.json) pridajte názov skillu do sekcie skills:
 
-## 🛠 Použitie
+skills:
+  - communication
+  - web_search
+  - skill-weather
 
-Popíš, ako môže používateľ vyvolať tento skill (napr. konverzačné frázy alebo triggery).
+6. REŠTART A TESTOVANIE
+Reštartujte agenta príkazmi:
+opencode stop
+opencode start
 
-**Príklad interakcie:**
-*   **Používateľ:** "Aktivuj [názov skillu] a zisti stav X."
-*   **Asistent:** "Rozumiem, stav X je momentálne v poriadku."
+Overenie funkčnosti: V chate s agentom zadajte príkaz prislúchajúci skillu (napr. "Aké je počasie?").
 
-## 🧩 Štruktúra Skillu (Manifest)
+TIPY:
+- Aktualizácia: V priečinku skillu spustite 'git pull'.
+- Logy: Ak niečo nefunguje, použite 'opencode logs'.
+"""
 
-Skill je definovaný v súbore `skill.json` (alebo podľa tvojej štruktúry). Hlavné komponenty:
-
-- **Intents:** [Zoznam úmyslov, ktoré skill spracováva]
-- **Actions:** [Zoznam akcií, ktoré vykonáva]
-
-## 🤝 Prispievanie
-
-1. Forkni tento projekt.
-2. Vytvor si vetvu pre tvoju funkciu (`git checkout -b feature/NovaFunkcia`).
-3. Commitni svoje zmeny (`git commit -m 'Pridaná nová funkcia'`).
-4. Pushni na vetvu (`git push origin feature/NovaFunkcia`).
-5. Otvor Pull Request.
-
-## 📄 Licencia
-
-Tento projekt je licencovaný pod [vyber si licenciu, napr. MIT] licenciou - podrobnosti nájdeš v súbore `LICENSE`.
+with open("/mnt/data/instalacia_opencode.txt", "w", encoding="utf-8") as f:
+    f.write(content)
