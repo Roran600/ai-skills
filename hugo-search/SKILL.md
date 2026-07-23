@@ -1,3 +1,4 @@
+---
 name: hugo-search
 description: Bezpečný výskumný asistent pre Hugo Wiki s kontrolou Git stavu
 license: MIT
