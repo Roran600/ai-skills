@@ -1,0 +1,26 @@
+{
+  "name": "opencode-skill-image-generation",
+  "version": "1.0.0",
+  "description": "Image generation skill for OpenCode with OpenRouter MCP integration",
+  "main": "index.js",
+  "bin": {
+    "image-generation": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "opencode",
+    "skill",
+    "image-generation",
+    "openrouter",
+    "mcp",
+    "ai-images"
+  ],
+  "author": "OpenCode Skills",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

@@ -1212,6 +1212,91 @@ TESTING:
 
 ---
 
+## 17. IMPLEMENTÁCIA
+
+### Súborová Štruktúra
+
+```
+~/.config/opencode/skills/image-generation/
+├── SKILL.md                    ← Táto špecifikácia
+├── LICENSE.txt                 ← MIT License
+├── README.md                   ← Dokumentácia pre používateľov
+├── package.json                ← Node.js configuration
+└── index.js                    ← Hlavný skript (Node.js)
+```
+
+### Spustenie
+
+```bash
+# Cez OpenCode CLI
+opencode skill image-generation
+
+# Alebo priamo
+node ~/.config/opencode/skills/image-generation/index.js
+```
+
+### MCP Integration (index.js)
+
+Skript `index.js` implementuje:
+
+1. **OpenRouter MCP Tools Calls:**
+   - `openrouter_list-models` - Dynamické načítanie dostupných modelov
+   - `openrouter_get-credits` - Kontrola zostávajúceho kreditu
+   - `openrouter_generate-image` - Generovanie obrázkov (inline base64)
+
+2. **8-Otázkový Workflow:**
+   - Interaktívny readline CLI
+   - Dynamické validácie
+   - Error handling
+
+3. **Batch Processing:**
+   - Multiple prompts (max 10)
+   - Multiple variants (max 5 per prompt)
+   - Max 50 images per session
+
+4. **Image Save Logic:**
+   - Base64 decode z MCP response
+   - Save ako PNG na disk
+   - Metadata JSON generovanie
+
+5. **Bezpečnosť:**
+   - Prompt validation (length, anti-injection)
+   - Credit check (warning, error stopping)
+   - File I/O validation
+
+### Key Functions
+
+```javascript
+// Security
+validatePrompt(prompt)           // Anti-injection checks
+getTimestamp()                   // Format timestamps
+getModelShortName(slug)          // Extract short name
+
+// MCP Integration
+fetchAvailableModels()           // openrouter_list-models
+fetchCreditBalance()             // openrouter_get-credits
+generateImage(model, prompt)     // openrouter_generate-image
+
+// File I/O
+ensureDirectory(path)            // Create directory if needed
+saveBase64Image(base64, path)    // Decode and save PNG
+
+// Interactive Workflow
+question1_Prompts(rl)            // Q1: Prompts
+question2_ModelSelection(rl)     // Q2: Model
+question3_AspectRatio(rl)        // Q3: Aspect ratio
+question4_Resolution(rl)         // Q4: Resolution
+question5_ReferenceImages(rl)    // Q5: References
+question6_Variants(rl)           // Q6: Variants
+question7_Upscaling(rl)          // Q7: Upscaling
+question8_OutputPath(rl)         // Q8: Output path
+
+// Main Orchestration
+main()                           // Main workflow
+```
+
+---
+
 **Jazyk skillu:** Slovenčina ✓  
 **MCP tools:** openrouter_generate-image, openrouter_list-models, openrouter_get-credits ✓  
 **Git operácie:** Iba `git status` (bez commit/push) ✓  
@@ -1221,3 +1306,9 @@ TESTING:
 **Reference images:** Áno (max 5, URL + local) ✓  
 **Anti-hacking:** Áno ✓  
 **No content filter:** Áno ✓
+
+---
+
+**Status:** ✅ KOMPLETNE IMPLEMENTOVANÉ  
+**Verzia:** 1.0.0  
+**Dátum:** 2026-08-12
