@@ -490,182 +490,207 @@ Kam chceš uložiť obrázky?
 
 ---
 
-## 4. FÁZA 3: PRÍPRAVA A VALIDÁCIA
+## 4. FÁZA 3: PRÍPRAVA A VALIDÁCIA (BASH)
 
 ### Pre Každý Prompt:
-1. Prompt validácia (length, anti-injection)
-2. Reference images path/URL validation (ak existujú)
-3. Model capabilities check (podľa supported_parameters)
+
+```bash
+# 1. Source utility functions
+source ./image-gen.sh
+
+# 2. Validate prompt (anti-injection)
+validate_prompt "$prompt" || {
+  echo "❌ Invalid prompt"
+  continue
+}
+
+# 3. Git status check (informácia)
+git status --porcelain | head -3
+```
 
 ### Globálne:
-1. Git status check (info, bez zmien)
-2. Credit balance validation
-3. **Cena kalkulácia:**
-   ```
-   base_cost = num_prompts × num_variants × model_price
-   upscale_cost = (IF upscale) × num_images × upscale_price
-   total_cost = base_cost + upscale_cost
-   remaining_balance = current_balance - total_cost
-   ```
 
-4. **Final Confirmation PRED generovaním:**
-   ```
-   ✅ PRÍPRAVA HOTOVÁ
-   
-   📊 SUMMARY:
-   - Promptov: 3
-   - Variantov na prompt: 2
-   - Celkem obrázkov: 6
-   - Model: openai/gpt-image-2 ($0.04 per image)
-   - Aspect Ratio: 16:9
-   - Resolution: 1K
-   - Upscaling: 2x (dodatočne $0.05 per image)
-   - Reference Images: 2
-   
-   💰 CENA:
-   - Base (6 images × $0.04): $0.24
-   - Upscaling (6 × $0.05): $0.30
-   - Total: $0.54
-   
-   💳 KREDITY:
-   - Aktuálne: $2.50
-   - Po generovaní: $1.96
-   
-   ⚠️  Pokračovať? [YES/NO]
-   ```
+```bash
+# 1. Git status check
+git status --porcelain
+
+# 2. Credit balance check
+credits=$(opencode mcp openrouter:get-credits | jq '.balance')
+if (( $(echo "$credits < 0.50" | bc -l) )); then
+  echo "⚠️ Low credits: \$$credits"
+fi
+
+# 3. Calculate total cost
+base_cost=$(echo "$num_prompts * $num_variants * $model_price" | bc -l)
+upscale_cost=0
+if [[ "$upscale" != "none" ]]; then
+  upscale_cost=$(echo "$base_cost * 0.02" | bc -l)  # Estimate
+fi
+total_cost=$(echo "$base_cost + $upscale_cost" | bc -l)
+remaining=$(echo "$credits - $total_cost" | bc -l)
+
+# 4. Display summary
+echo "✅ PRÍPRAVA HOTOVÁ"
+echo ""
+echo "📊 SUMMARY:"
+echo "  - Promptov: $num_prompts"
+echo "  - Variantov na prompt: $num_variants"
+echo "  - Celkem obrázkov: $total_images"
+echo "  - Model: $selected_model (\$$model_price per image)"
+echo "  - Aspect Ratio: $aspect_ratio"
+echo "  - Resolution: $resolution"
+if [[ "$upscale" != "none" ]]; then
+  echo "  - Upscaling: $upscale"
+fi
+echo ""
+echo "💰 CENA:"
+echo "  - Base: \$$base_cost"
+if [[ "$upscale" != "none" ]]; then
+  echo "  - Upscaling: \$$upscale_cost"
+fi
+echo "  - Total: \$$total_cost"
+echo ""
+echo "💳 KREDITY:"
+echo "  - Aktuálne: \$$credits"
+echo "  - Po generovaní: \$$remaining"
+echo ""
+
+# 5. Final confirmation
+read -p "⚠️ Pokračovať? [YES/NO]: " confirm
+[[ "$confirm" != "YES" ]] && exit 0
+```
 
 ---
 
-## 5. FÁZA 4: GENERÁCIA OBRÁZKOV (MCP + INLINE IMAGE SAVE)
+## 5. FÁZA 4: GENERÁCIA OBRÁZKOV (BASH)
 
 ### Main Generation Loop
 
-```
-FOR EACH prompt IN prompts:
-     FOR EACH variant IN range(num_variants):
-         
-         # 1. Call Generation MCP Tool
-         response = openrouter_generate_image(
-             model=selected_model,
-             prompt=prompt,
-             size=resolution
-         )
-         # MCP vracia: { image: {...}, metadata: {...}, generation_id: "gen-xyz" }
-         
-         # 2. Progress Update
-         Ukáž: "Generovanie [X]/[TOTAL] obrázkov..."
-         
-         # 3. Extract Image from Inline Content Block
-         base64_data = response.image.source.data
-         # response.image.source = { type: "base64", media_type: "image/png", data: "iVBORw0KGgo..." }
-         
-         # 4. Decode Base64 → Binary PNG
-         png_binary = Buffer.from(base64_data, 'base64')
-         
-         # 5. Save PNG to Disk
-         filename = f"image_{timestamp}_{index:03d}_{model_short}.png"
-         writeFileSync(output_path/filename, png_binary)
-         
-         # 6. Generate Metadata (s generation_id z MCP)
-         metadata_json = {
-             "filename": filename,
-             "prompt": prompt,
-             "model": model,
-             "generation_id": response.metadata.generation_id,  ← Z MCP response
-             "aspect_ratio": ratio,
-             "resolution": resolution,
-             "generation_time_ms": response.metadata.duration_ms,
-             "cost_usd": response.metadata.cost,
-             "timestamp": ISO_timestamp,
-             "source": "openrouter-mcp-inline"
-         }
-         Save metadata_json → JSON file
-         
-         # 7. Conditional Upscaling (ak user vybral)
-         IF upscale:
-             upscaled_image = apply_upscale(png_binary, scale_factor)
-             upscaled_filename = f"{filename_without_ext}_upscaled_{scale_factor}.png"
-             writeFileSync(output_path/upscaled_filename, upscaled_image)
-             Update metadata (upscaled: true, factor: 2x/4x)
-```
+```bash
+#!/bin/bash
 
-### MCP Response Structure (Čo dostaneme)
+# Setup
+source ./image-gen.sh
 
-```json
-{
-  "image": {
-    "type": "image",
-    "source": {
-      "type": "base64",
-      "media_type": "image/png",
-      "data": "iVBORw0KGgoAAAANSUhEUgAA..." ← BASE64 PNG DATA
-    }
-  },
-  "metadata": {
-    "generation_id": "gen-abc123xyz",
-    "cost": 0.08,
-    "duration_ms": 45000,
-    "provider": "together",
-    "tokens": {
-      "prompt": 42,
-      "completion": 0
-    }
-  }
-}
-```
+timestamp=$(get_timestamp)
+output_dir="${output_path:-.}/images_generated"
+ensure_dir "$output_dir" || exit 1
 
-### Image Extraction + Save Flow
+total_images=$((num_prompts * num_variants))
+index=1
 
-```python
-# Step 1: Extract base64 from inline image content block
-base64_string = response['image']['source']['data']
+# Main loop - generate images
+for prompt in "${prompts[@]}"; do
+  for ((variant = 1; variant <= num_variants; variant++)); do
+    
+    # Step 1: Call OpenRouter MCP via opencode CLI
+    echo "🎨 Generating [$index/$total_images]..."
+    
+    response=$(opencode mcp openrouter:generate-image \
+      model="$selected_model" \
+      prompt="$prompt" \
+      size="$resolution" \
+      aspect_ratio="$aspect_ratio" \
+      2>&1)
+    
+    # Step 2: Check if response is valid
+    if [[ -z "$response" ]] || [[ "$response" == *"error"* ]]; then
+      echo "❌ Generation failed for prompt: $prompt"
+      echo "Response: $response"
+      continue
+    fi
+    
+    # Step 3: Extract base64 + metadata from JSON response
+    generation_id=$(echo "$response" | jq -r '.metadata.generation_id // "unknown"' 2>/dev/null)
+    base64_data=$(echo "$response" | jq -r '.image.source.data // empty' 2>/dev/null)
+    cost=$(echo "$response" | jq -r '.metadata.cost // 0' 2>/dev/null)
+    duration=$(echo "$response" | jq -r '.metadata.duration_ms // 0' 2>/dev/null)
+    
+    if [[ -z "$base64_data" ]]; then
+      echo "❌ No base64 data in response"
+      continue
+    fi
+    
+    # Step 4: Decode base64 + save PNG
+    model_short=$(get_model_short_name "$selected_model")
+    png_file="${output_dir}/image_${timestamp}_$(printf %03d $index)_${model_short}.png"
+    
+    if ! save_image "$base64_data" "$png_file"; then
+      echo "❌ Failed to save PNG: $png_file"
+      continue
+    fi
+    echo "✅ Saved: $png_file ($(du -h "$png_file" | cut -f1))"
+    
+    # Step 5: Save metadata JSON
+    metadata_file="${output_dir}/image_${timestamp}_$(printf %03d $index)_${model_short}_metadata.json"
+    metadata=$(create_metadata_json \
+      "$(basename "$png_file")" \
+      "$prompt" \
+      "$selected_model" \
+      "$generation_id" \
+      "$cost" \
+      "$duration")
+    
+    echo "$metadata" > "$metadata_file"
+    echo "✅ Metadata: $metadata_file"
+    
+    # Step 6: Conditional upscaling (ak user vybral)
+    if [[ "$upscale" != "none" ]]; then
+      echo "📈 Upscaling with factor: $upscale"
+      
+      upscale_response=$(opencode mcp openrouter:generate-image \
+        model="$selected_model" \
+        image="$png_file" \
+        scale="$upscale" \
+        2>&1)
+      
+      upscale_base64=$(echo "$upscale_response" | jq -r '.image.source.data // empty' 2>/dev/null)
+      upscaled_file="${output_dir}/image_${timestamp}_$(printf %03d $index)_${model_short}_upscaled_${upscale}.png"
+      
+      if [[ -n "$upscale_base64" ]] && save_image "$upscale_base64" "$upscaled_file"; then
+        echo "✅ Upscaled: $upscaled_file"
+      else
+        echo "⚠️ Upscaling failed for: $png_file"
+      fi
+    fi
+    
+    ((index++))
+  done
+done
 
-# Step 2: Decode base64 → binary PNG bytes
-png_bytes = base64.b64decode(base64_string)
-
-# Step 3: Write binary to disk
-with open(output_filepath, 'wb') as f:
-    f.write(png_bytes)
-
-# Result: PNG file uložený na disku
+echo ""
+echo "✅ Generation complete!"
 ```
 
 ### Error Handling
 
-```
-TRY:
-    Call openrouter_generate_image() via MCP
-CATCH mcp_error:
-    Log: "Generation failed: [error]"
-    IF retry_count < 2:
-        Retry (auto-retry 2x s exponential backoff)
-    ELSE:
-        IF available_fallback_model:
-            Suggest & use cheaper model
-            Continue
-        ELSE:
-            ERROR: "Generation failed, skipping this prompt"
-            Continue to next
-
-TRY:
-    Decode base64 from response
-CATCH decode_error:
-    Log: "Base64 decode failed"
-    Mark image as failed in metadata
-    Continue to next
-
-TRY:
-    Write PNG to disk
-CATCH io_error:
-    ERROR: "Cannot write to [path] - [reason]"
-    Stop generation (kritická chyba)
-
-TRY:
-    Apply upscaling (ak vybraný)
-CATCH upscale_error:
-    Keep original image
-    Mark upscale as failed in metadata
-    Continue to next
+```bash
+# TRY-CATCH pattern in Bash
+{
+  # Call MCP tool
+  response=$(opencode mcp openrouter:generate-image ...) || {
+    echo "❌ MCP call failed"
+    continue
+  }
+  
+  # Parse JSON
+  base64_data=$(echo "$response" | jq -r '.image.source.data // empty') || {
+    echo "❌ JSON parse failed"
+    continue
+  }
+  
+  # Check if base64 exists
+  [[ -z "$base64_data" ]] && {
+    echo "❌ No base64 data in response"
+    continue
+  }
+  
+  # Save PNG
+  save_image "$base64_data" "$png_file" || {
+    echo "❌ Save failed"
+    continue
+  }
+} 2>&1
 ```
 
 ---
@@ -1212,17 +1237,18 @@ TESTING:
 
 ---
 
-## 17. IMPLEMENTÁCIA
+## 17. IMPLEMENTÁCIA (BASH)
 
 ### Súborová Štruktúra
 
 ```
-~/.config/opencode/skills/image-generation/
-├── SKILL.md                    ← Táto špecifikácia
-├── LICENSE.txt                 ← MIT License
-├── README.md                   ← Dokumentácia pre používateľov
-├── package.json                ← Node.js configuration
-└── index.js                    ← Hlavný skript (Node.js)
+image-generation/
+├── SKILL.md                    ← Táto špecifikácia (2000+ riadkov)
+│                                ├── Sekcia 4: Bash príkazy na prípravu
+│                                ├── Sekcia 5: Reálny bash workflow
+│                                └── Sekcia 6: Metadata JSON štruktúra
+├── image-gen.sh                ← Utility functions (~80 riadkov)
+└── LICENSE.txt                 ← MIT License
 ```
 
 ### Spustenie
@@ -1231,60 +1257,81 @@ TESTING:
 # Cez OpenCode CLI
 opencode skill image-generation
 
-# Alebo priamo
-node ~/.config/opencode/skills/image-generation/index.js
+# OpenCode vykoná:
+# 1. Čítaj SKILL.md
+# 2. Source image-gen.sh (utility functions)
+# 3. Vykonaj bash príkazy z Sekcia 4-5
 ```
 
-### MCP Integration (index.js)
+### Utility Functions (image-gen.sh)
 
-Skript `index.js` implementuje:
+Šesť funkcií:
 
-1. **OpenRouter MCP Tools Calls:**
-   - `openrouter_list-models` - Dynamické načítanie dostupných modelov
-   - `openrouter_get-credits` - Kontrola zostávajúceho kreditu
-   - `openrouter_generate-image` - Generovanie obrázkov (inline base64)
+1. **save_image(base64, path)**
+   - Dekóduj base64 string → PNG binary
+   - Ulož na disk
+   - Return 0 (OK) alebo 1 (Error)
 
-2. **8-Otázkový Workflow:**
-   - Interaktívny readline CLI
-   - Dynamické validácie
-   - Error handling
+2. **ensure_dir(path)**
+   - Vytvor directory ak neexistuje
+   - Recursive creation
+   - Kontrola permissions
 
-3. **Batch Processing:**
-   - Multiple prompts (max 10)
-   - Multiple variants (max 5 per prompt)
-   - Max 50 images per session
+3. **get_timestamp()**
+   - Format: YYYYMMDD_HHMMSS
+   - Na naming obrázkov a batch ID
 
-4. **Image Save Logic:**
-   - Base64 decode z MCP response
-   - Save ako PNG na disk
-   - Metadata JSON generovanie
+4. **get_model_short_name(slug)**
+   - Input: "openai/dall-e-3"
+   - Output: "dall-e-3" (max 20 chars)
+   - Pre filename
 
-5. **Bezpečnosť:**
-   - Prompt validation (length, anti-injection)
-   - Credit check (warning, error stopping)
-   - File I/O validation
+5. **create_metadata_json(filename, prompt, model, gen_id, cost, duration)**
+   - Vráť JSON object (string)
+   - Fields: filename, prompt, model_used, generation_id, source, generation{timestamp, duration_ms, cost_usd}
 
-### Key Functions
+6. **validate_prompt(prompt)**
+   - Kontrola length (5-1500)
+   - SQL injection detection
+   - Command injection detection
+   - Path traversal detection
+   - Null byte detection
+   - Return 0 (OK) alebo 1 (Invalid)
 
-```javascript
-// Security
-validatePrompt(prompt)           // Anti-injection checks
-getTimestamp()                   // Format timestamps
-getModelShortName(slug)          // Extract short name
+### Workflow Orchestration (z SKILL.md)
 
-// MCP Integration
-fetchAvailableModels()           // openrouter_list-models
-fetchCreditBalance()             // openrouter_get-credits
-generateImage(model, prompt)     // openrouter_generate-image
+```bash
+# 1. Source utilities
+source ./image-gen.sh
 
-// File I/O
-ensureDirectory(path)            // Create directory if needed
-saveBase64Image(base64, path)    // Decode and save PNG
+# 2. Parse user input (8 questions via bash read)
+read -p "Enter prompts (one per line): " prompts
+read -p "Model selection (1=Auto, 2=Manual, 3=Custom): " model_choice
+read -p "Aspect ratio (16:9/1:1/4:3/9:16/21:9): " aspect_ratio
+read -p "Resolution (1K/2K/4K): " resolution
+read -p "Variants per prompt (1-5): " num_variants
+read -p "Upscaling (none/2x/4x): " upscale
+read -p "Output path (./images_generated): " output_path
 
-// Interactive Workflow
-question1_Prompts(rl)            // Q1: Prompts
-question2_ModelSelection(rl)     // Q2: Model
-question3_AspectRatio(rl)        // Q3: Aspect ratio
+# 3. Fetch models from opencode mcp
+models=$(opencode mcp openrouter:list-models \
+  output_modalities=image \
+  sort=pricing-low-to-high)
+
+# 4. Select model based on user choice
+if [[ "$model_choice" == "1" ]]; then
+  selected_model=$(echo "$models" | jq -r '.[0].slug')
+elif [[ "$model_choice" == "2" ]]; then
+  echo "$models" | jq -r '.[:15] | .[] | "\(.slug) - \(.price)"'
+  read -p "Select model number: " model_num
+  selected_model=$(echo "$models" | jq -r ".[$((model_num-1))].slug")
+else
+  read -p "Enter custom model slug: " selected_model
+fi
+
+# 5. Main generation (loop - see Sekcia 5)
+# ... (complete workflow from Sekcia 5)
+```
 question4_Resolution(rl)         // Q4: Resolution
 question5_ReferenceImages(rl)    // Q5: References
 question6_Variants(rl)           // Q6: Variants
