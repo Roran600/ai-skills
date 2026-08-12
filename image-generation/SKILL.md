@@ -8,21 +8,20 @@ metadata:
   workflow: image-generation
 ---
 
-Si asistent na generovanie obrázkov cez OpenRouter MCP. Tvojou úlohou je:
+## Funkčné požiadavky
 
-1. Fetchovať dostupné image generation modely cez OpenRouter MCP
-2. Umožniť používateľovi vybrať si model (auto/manual/custom)
-3. Konfigurovať parametre generácie (aspect ratio, resolution, reference images)
-4. Generovať obrázky cez `openrouter_generate-image` MCP tool
-5. **ULOŽIŤ OBRÁZKY** z inline image content block na disk (base64 decode)
-6. Podporovať batch generovanie (viacero promptov naraz)
-7. Umožniť upscaling vygenerovaných obrázkov
-8. Uložiť obrázky + metadáta na disk
-9. Poskytnúť detailnú štatistiku a post-action menu
+- Fetchovať dostupné image generation modely cez OpenRouter MCP
+- Umožniť používateľovi vybrať si model (auto/manual/custom)
+- Konfigurovať parametre generácie (aspect ratio, resolution, reference images)
+- Generovať obrázky cez `openrouter_generate-image` MCP tool
+- Uložiť obrázky z inline image content block na disk (base64 decode)
+- Podporovať batch generovanie (viacero promptov naraz)
+- Umožniť upscaling vygenerovaných obrázkov
+- Poskytnúť detailnú štatistiku a post-action menu
 
 ---
 
-## 1. KONTEXT A BEZPEČNOSŤ (STRIKTNÉ)
+## Kontext a bezpečnosť
 
 ### Pracovný Priestor
 - Pracuješ s obrázkami, metadátami a OpenRouter MCP
@@ -103,7 +102,7 @@ PRED začatím:
 
 ---
 
-## 2. MODEL DISCOVERY - DYNAMICKÉ (MCP)
+## Model discovery
 
 ### Auto-Discovery pri Spustení Skillu
 
@@ -159,334 +158,614 @@ openrouter_list-models (MCP tool)
 
 ---
 
-## 3. INTERAKTÍVNY WORKFLOW - 8 OTÁZOK
+## 3. Interaktívny workflow - 8 otázok
+
+Skill sa spúšťa v interactive režime. Budeš odpoveť na 8 otázok a potom sa generujú obrázky.
 
 ### Fáza 0: Inicializácia
 
-```
-1. Git status check (info)
-2. openrouter_get-credits (validation)
-3. Fetch modely z API (caching na session)
-```
+Skill automaticky:
+1. Skontroluje git status (info)
+2. Validuje OpenRouter kredit balance
+3. Fetchuje dostupné image generation modely
+4. Sourcuje utility functions z `image-gen.sh`
 
----
+### Otázka 1: Prompt(y) na generovanie
 
-### OTÁZKA 1: Prompt(y) na Generovanie
-
-```
-Zadaj prompt(y) na generovanie:
-
-Možnosti:
-1. Jeden prompt
-   → Generujem 1 obrázok (×varianty z Q6)
-   
-2. Viacero promptov
-   → Každý riadok = jeden prompt
-   → Max 10 promptov per session
-   
-3. Príklad formátu:
-   "A futuristic city at sunset"
-   "Minimalist white room with plants"
-   "Abstract geometric patterns"
-```
+Zadáš jeden alebo viac promptov (max 10 per session).
 
 **Validácia:**
 - Každý prompt: min 5, max 1500 znakov
 - Anti-injection checks (SQL, command, path traversal)
 - UTF-8 encoding validation
-- Count validation: 1-10 promptov
 
-**Output:**
+**Príklad:**
 ```
-Prompty načítané: 3
-Prompty budú opakované 1× (default, zmení sa v Q6)
-```
-
----
-
-### OTÁZKA 2: Výber Modelu
-
-```
-Ako chceš vybrať model?
-
-1. Automatický (Recommended)
-   → Fetchnem z API, najlacnejší ✓
-
-2. Manuálny výber
-   → Fetchnem TOP 15 modelov, budeš vyberať
-
-3. Zadaj konkrétny model slug
-   → Napr. "openai/dall-e-3"
+Zadaj prompt(y) na generovanie (jeden per riadok):
+A futuristic city at sunset with neon lights
+Minimalist white room with plants
+Abstract geometric patterns
 ```
 
-**Ak Automatický (Voľba 1):**
+### Otázka 2: Výber modelu
+
+Voľby:
+1. **Automatický** (Recommended) - vyberie lacnejší model z API
+2. **Manuálny výber** - zobrazí TOP 15 modelov podľa ceny
+3. **Vlastný model slug** - napr. `openai/dall-e-3`
+
+Model bude použitý pre všetky generácie v session.
+
+### Otázka 3: Aspect ratio
+
+Voľby:
+1. **16:9 (Landscape)** ← RECOMMENDED
+2. **1:1 (Square)**
+3. **4:3 (Portrait-ish)**
+4. **9:16 (Portrait)**
+5. **21:9 (Ultra-wide)**
+6. **Custom** - zadáš presne "3:2" alebo "1920x1080"
+
+**Default:** 16:9
+
+### Otázka 4: Resolution (Veľkosť)
+
+Voľby:
+1. **1K** ← RECOMMENDED
+   - Rýchle (~20-30s)
+   - Lacné (~$0.03-0.08)
+   - Vhodné pre web, sociálne siete
+
+2. **2K**
+   - Stredný čas (~30-45s)
+   - Stredná cena (~$0.06-0.15)
+   - Vhodné pre print
+
+3. **4K**
+   - Pomalý (~45-60s)
+   - Drahý (~$0.12-0.40)
+   - Profesionálna kvalita
+
+4. **Custom** - zadáš presne "1920x1080"
+
+**Default:** 1K
+
+### Otázka 5: Reference images (voliteľné)
+
+Voľby:
+1. **Nie** ← DEFAULT - generujem podľa promptu
+2. **Áno** - zadáš až 5 reference obrázkov
+
+Ak vyberieš "Áno", zadáš URLs (HTTPS) alebo lokálne cesty:
 ```
-Fetchnem modely, seradím podľa ceny (lacnejší = mejor)
-Recommendation: openai/gpt-image-2 ($0.04 per image)
-
-Model bude používaný pre všetky generácie.
-```
-
-**Ak Manuálny (Voľba 2):**
-```
-TOP 15 modelov (seradené podľa ceny):
-
-1. openai/gpt-image-2 - $0.04 (⭐⭐⭐⭐⭐ quality)
-2. bytedance-seed/seedream-4.5 - $0.03 (⭐⭐⭐⭐)
-3. stabilityai/stable-diffusion-3-5-large - $0.04 (⭐⭐⭐⭐)
-4. mistralai/mistral-large - $0.05 (⭐⭐⭐⭐⭐)
-5. [... ďalšie 10 modelov ...]
-
-Vyberi:
-→ Číslo (1-15)
-→ Alebo priamo model slug: "model/id"
-```
-
-**Ak Custom Slug (Voľba 3):**
-```
-Zadaj presný model slug:
-Napr.: openai/dall-e-3
-
-Validation: Model existuje a podporuje image generation
-```
-
----
-
-### OTÁZKA 3: Aspect Ratio
-
-```
-Aspect Ratio výstupu?
-
-1. 16:9 (Landscape) ← RECOMMENDED
-   → Standard landscape (1920x1080, 1536x864, etc.)
-
-2. 1:1 (Square)
-   → Perfect square (1024x1024, 2048x2048, etc.)
-
-3. 4:3 (Portrait-ish)
-   → Classic aspect ratio
-
-4. 9:16 (Portrait)
-   → Tall vertical (1080x1920, etc.)
-
-5. 21:9 (Ultra-wide)
-   → Cinematic ultra-wide
-
-6. Custom ratio
-   → Zadaj: "3:2" alebo "1920x1080"
-```
-
-**Mapping na Pixely (Default):**
-```
-1K Setting (Q4):
-- 16:9 → 1536x864
-- 1:1 → 1024x1024
-- 4:3 → 1280x960
-- 9:16 → 576x1024
-- 21:9 → 2560x1080
-
-2K Setting:
-- 16:9 → 3072x1728
-- 1:1 → 2048x2048
-- etc.
+https://example.com/color-palette.jpg
+/home/user/style-reference.png
+https://another.com/composition.jpg
 ```
 
-**Default:** 16:9 (landscape) - ak user nevyberie
+Podporované formáty: PNG, JPG, WEBP, GIF
 
----
+### Otázka 6: Batch generovanie - počet variantov
 
-### OTÁZKA 4: Resolution (Veľkosť)
+Koľko variantov na KAŽDÝ prompt?
 
-```
-Ako high-res chceš obrázok?
+Voľby: 1, 2, 3, 4, 5
 
-1. 1K (1536x864 / 1024x1024 / etc.) ← RECOMMENDED
-   → Rýchle (~20-30s)
-   → Lacné (~$0.03-0.08)
-   → Vhodné pre web, sociálne siete
-
-2. 2K (3072x1728 / 2048x2048 / etc.)
-   → Stredný čas (~30-45s)
-   → Stredná cena (~$0.06-0.15)
-   → Vhodné pre print, prezentácie
-
-3. 4K (6144x3456 / 4096x4096 / etc.)
-   → Pomalý (~45-60s)
-   → Drahý (~$0.12-0.40)
-   → Vhodné pre high-quality print, profesionál
-
-4. Custom resolution
-   → Zadaj konkrétnu veľkosť: "1920x1080"
-   → Alebo ratio: "3:2"
-```
-
-**Cena Odhad (sa ukáže po výbere):**
-```
-Vzor: 3 prompty × 1 variant × model_price
-Napr.: 3 × 1 × $0.04 = $0.12 za set
-```
-
-**Default:** 1K - ak user nevyberie
-
----
-
-### OTÁZKA 5: Reference Images (Voliteľné)
-
-```
-Chceš použiť reference obrázky na inšpiráciu?
-
-1. Nie (Bez reference) ← DEFAULT
-   → Generujem podľa iba promptu
-
-2. Áno (Max 5 obrázkov)
-   → Budeš môcť zadať URLs alebo lokálne cesty
-```
-
-**Ak Áno - Postup:**
-
-```
-Zadaj reference obrázky (max 5):
-
-Formáty:
-- URL: https://example.com/image.jpg
-- Lokálne: /home/user/image.png
-- Podporované: PNG, JPG, WEBP, GIF
-
-Príklady:
-1. https://example.com/color-palette.jpg
-2. /home/user/style-reference.png
-3. https://another.com/composition.jpg
-
-Účel reference images:
-- Vizuálny štýl
-- Farby a paleta
-- Kompozícia
-- Mood a atmosféra
-
-Poznámka: OpenRouter model bude brať reference ako inšpiráciu,
-         ale finálny výstup bude vždy generovaný s novým obsahom
-```
-
-**Validácia:**
-- Max 5 obrázkov
-- URL check (HTTPS)
-- Local path check (file exists)
-- Format validation (PNG, JPG, WEBP, GIF)
-
----
-
-### OTÁZKA 6: Batch Generovanie - Počet Variantov
-
-```
-Koľko variantov chceš na KAŽDÝ prompt?
-
-1. 1 obrázok (Default)
-   → 1 prompt × 1 variant
-
-2. 2 obrázky (Varianty)
-   → 1 prompt = 2 rozdielne generácie
-
-3. 3 obrázky (Podrobný)
-   → Viac variantov na výber
-
-4. 4-5 obrázkov
-   → Maximum variantov
-
-Príklad:
+**Príklad:**
 - 3 prompty × 2 varianty = 6 obrázkov
-- 5 promptov × 3 varianty = 15 obrázkov (MAX!)
+- 5 promptov × 3 varianty = 15 obrázkov
+
+**Default:** 1
+
+**Kalkulácia ceny:**
+```
+total_cost = num_prompts × num_variants × model_price_per_image
 ```
 
-**Kalkulácia Ceny:**
-```
-total_images = num_prompts × num_variants
-total_cost = total_images × model_price_per_image
+### Otázka 7: Upscaling (voliteľné)
 
-Príklady:
-- 1 prompt × 1 variant × $0.04 = $0.04
-- 3 prompty × 2 varianty × $0.04 = $0.24
-- 5 promptov × 3 varianty × $0.04 = $0.60
-- 10 promptov × 5 variantov × $0.04 = $2.00
-```
+Voľby:
+1. **Nie** ← DEFAULT
+2. **2x upscale** (~$0.02-0.05 per image, +10-20s)
+3. **4x upscale** (~$0.04-0.08 per image, +20-30s)
 
-**Default:** 1 obrázok - ak user nevyberie
+**Default:** Nie
+
+### Otázka 8: Cesta uloženia
+
+Voľby:
+1. **Aktuálny adresár** (./)
+2. **Podadresár** (./images/)
+3. **Custom cesta** - absolútna alebo relatívna
+
+Príklady custom cesty:
+- `/home/user/generated-images`
+- `./my-project/assets`
+- `~/ai-images`
+
+**Default:** `./images_generated/`
+
+Výstupné súbory:
+```
+image_20260812_103000_001_dalle3.png
+image_20260812_103000_001_dalle3_metadata.json
+batch_summary_20260812_103000.json
+```
 
 ---
 
-### OTÁZKA 7: Upscaling (Voliteľné)
+## Reference: Detaily interaktívneho workflow
 
+Táto sekcia obsahuje podrobný popis ako workflow funguje interné, pre referenčné účely.
+
+### Workflow orchestrácia
+
+```bash
+#!/bin/bash
+set -e
+
+# Source utility functions (image-gen.sh musí existovať v rovnakom adresári)
+source ./image-gen.sh
+
+echo "🎨 IMAGE GENERATION SKILL"
+echo "=========================="
+echo ""
+
+# ============================================================================
+# FÁZA 0: INICIALIZÁCIA
+# ============================================================================
+
+# Git status check (info)
+echo "📁 Git status:"
+git status --porcelain | head -5 || true
+echo ""
+
+# Credit balance check (validation)
+echo "💳 Checking OpenRouter credits..."
+credits=$(openrouter_get-credits 2>/dev/null | jq '.balance // 0' || echo "0")
+
+if (( $(echo "$credits < 0.10" | bc -l) )); then
+  echo "❌ ERROR: Insufficient credits (\$$credits)"
+  exit 1
+fi
+
+echo "✅ Credits OK: \$$credits"
+echo ""
+
+# Fetch models from API
+echo "⏳ Fetching available models..."
+models=$(openrouter_list-models \
+  --request '{"output_modalities":"image","sort":"pricing-low-to-high","limit":50}' 2>/dev/null || echo "[]")
+
+model_count=$(echo "$models" | jq 'length // 0')
+if [[ "$model_count" -eq 0 ]]; then
+  echo "❌ ERROR: Could not fetch models"
+  exit 1
+fi
+
+echo "✅ Loaded $model_count image generation models"
+echo ""
+
+# ============================================================================
+# OTÁZKA 1: PROMPT(Y) NA GENEROVANIE
+# ============================================================================
+
+echo "❓ OTÁZKA 1: Zadaj prompt(y) na generovanie"
+echo "  (Jeden per riadok, max 10, min 5 znakov per prompt)"
+echo ""
+
+# Read prompts
+prompts=()
+while true; do
+  read -p "Prompt: " prompt_input
+  [[ -z "$prompt_input" ]] && break
+  
+  # Validate prompt
+  if validate_prompt "$prompt_input" 2>/dev/null; then
+    prompts+=("$prompt_input")
+    if [[ ${#prompts[@]} -ge 10 ]]; then
+      echo "ℹ️ Maximum 10 promptov dosiahnutý"
+      break
+    fi
+  else
+    echo "❌ Invalid prompt (5-1500 znakov, bez SQL/command injection)"
+    continue
+  fi
+done
+
+if [[ ${#prompts[@]} -eq 0 ]]; then
+  echo "❌ ERROR: No valid prompts entered"
+  exit 1
+fi
+
+echo "✅ Prompty načítané: ${#prompts[@]}"
+echo ""
+
+# ============================================================================
+# OTÁZKA 2: VÝBER MODELU
+# ============================================================================
+
+echo "❓ OTÁZKA 2: Ako chceš vybrať model?"
+echo "  1. Automatický (Recommended)"
+echo "  2. Manuálny výber (TOP 15)"
+echo "  3. Vlastný model slug"
+echo ""
+
+read -p "Voľba [1-3]: " model_choice
+
+case "$model_choice" in
+  1)
+    # Auto: select cheapest
+    selected_model=$(echo "$models" | jq -r '.[0].slug // empty')
+    model_price=$(echo "$models" | jq -r '.[0].pricing.prompt // "0.04"')
+    if [[ -z "$selected_model" ]]; then
+      echo "❌ ERROR: Could not select automatic model"
+      exit 1
+    fi
+    echo "✅ Vybraný model: $selected_model (\$$model_price per image)"
+    ;;
+  
+  2)
+    # Manual: show TOP 15
+    echo ""
+    echo "TOP 15 modelov (seradené podľa ceny):"
+    echo "$models" | jq -r '.[:15] | to_entries[] | "[\(.key + 1)] \(.value.slug) - $\(.value.pricing.prompt // "0.04")"' || true
+    echo ""
+    read -p "Voľba [1-15] alebo model slug: " model_input
+    
+    if [[ "$model_input" =~ ^[0-9]+$ ]]; then
+      # Numeric selection
+      selected_model=$(echo "$models" | jq -r ".[$((model_input - 1))].slug // empty")
+      model_price=$(echo "$models" | jq -r ".[$((model_input - 1))].pricing.prompt // \"0.04\"")
+    else
+      # Custom slug
+      selected_model="$model_input"
+      model_price="0.04"  # Estimate
+    fi
+    
+    if [[ -z "$selected_model" ]]; then
+      echo "❌ ERROR: Invalid model selection"
+      exit 1
+    fi
+    echo "✅ Vybraný model: $selected_model (\$$model_price per image)"
+    ;;
+  
+  3)
+    # Custom slug
+    read -p "Model slug (napr. openai/dall-e-3): " selected_model
+    model_price="0.04"  # Estimate - actual price will be checked later
+    
+    if [[ -z "$selected_model" ]]; then
+      echo "❌ ERROR: Model slug required"
+      exit 1
+    fi
+    echo "✅ Vybraný model: $selected_model (odhad ceny: \$$model_price per image)"
+    ;;
+  
+  *)
+    echo "❌ ERROR: Invalid choice"
+    exit 1
+    ;;
+esac
+echo ""
+
+# ============================================================================
+# OTÁZKA 3: ASPECT RATIO
+# ============================================================================
+
+echo "❓ OTÁZKA 3: Aspect ratio výstupu?"
+echo "  1. 16:9 (Landscape) ← RECOMMENDED"
+echo "  2. 1:1 (Square)"
+echo "  3. 4:3 (Portrait-ish)"
+echo "  4. 9:16 (Portrait)"
+echo "  5. 21:9 (Ultra-wide)"
+echo "  6. Custom ratio"
+echo ""
+
+read -p "Voľba [1-6]: " aspect_choice
+aspect_ratio="16:9"  # Default
+
+case "$aspect_choice" in
+  1) aspect_ratio="16:9" ;;
+  2) aspect_ratio="1:1" ;;
+  3) aspect_ratio="4:3" ;;
+  4) aspect_ratio="9:16" ;;
+  5) aspect_ratio="21:9" ;;
+  6)
+    read -p "Vlastný ratio (napr. 3:2): " aspect_ratio
+    if [[ -z "$aspect_ratio" ]]; then
+      aspect_ratio="16:9"
+    fi
+    ;;
+  *)
+    echo "ℹ️ Default: 16:9"
+    ;;
+esac
+
+echo "✅ Aspect ratio: $aspect_ratio"
+echo ""
+
+# ============================================================================
+# OTÁZKA 4: RESOLUTION
+# ============================================================================
+
+echo "❓ OTÁZKA 4: Resolution (veľkosť)?"
+echo "  1. 1K ← RECOMMENDED"
+echo "  2. 2K"
+echo "  3. 4K"
+echo "  4. Custom"
+echo ""
+
+read -p "Voľba [1-4]: " resolution_choice
+resolution="1K"  # Default
+
+case "$resolution_choice" in
+  1) resolution="1K" ;;
+  2) resolution="2K" ;;
+  3) resolution="4K" ;;
+  4)
+    read -p "Vlastná veľkosť (napr. 1920x1080): " resolution
+    if [[ -z "$resolution" ]]; then
+      resolution="1K"
+    fi
+    ;;
+  *)
+    echo "ℹ️ Default: 1K"
+    ;;
+esac
+
+echo "✅ Resolution: $resolution"
+echo ""
+
+# ============================================================================
+# OTÁZKA 5: REFERENCE IMAGES (OPTIONAL)
+# ============================================================================
+
+echo "❓ OTÁZKA 5: Chceš reference images?"
+echo "  1. Nie ← DEFAULT"
+echo "  2. Áno (max 5)"
+echo ""
+
+read -p "Voľba [1-2]: " reference_choice
+reference_images=()
+
+if [[ "$reference_choice" == "2" ]]; then
+  echo ""
+  echo "Zadaj reference images (jeden per riadok, prázdny riadok = hotovo):"
+  while true; do
+    read -p "Reference image: " ref_input
+    [[ -z "$ref_input" ]] && break
+    reference_images+=("$ref_input")
+    if [[ ${#reference_images[@]} -ge 5 ]]; then
+      echo "ℹ️ Maximum 5 reference images dosiahnutý"
+      break
+    fi
+  done
+fi
+
+echo "✅ Reference images: ${#reference_images[@]}"
+echo ""
+
+# ============================================================================
+# OTÁZKA 6: BATCH GENEROVANIE - POČET VARIANTOV
+# ============================================================================
+
+echo "❓ OTÁZKA 6: Koľko variantov na KAŽDÝ prompt?"
+echo "  1. 1 (default)"
+echo "  2. 2"
+echo "  3. 3"
+echo "  4. 4"
+echo "  5. 5"
+echo ""
+
+read -p "Voľba [1-5]: " variant_choice
+num_variants=1  # Default
+
+case "$variant_choice" in
+  1) num_variants=1 ;;
+  2) num_variants=2 ;;
+  3) num_variants=3 ;;
+  4) num_variants=4 ;;
+  5) num_variants=5 ;;
+  *)
+    echo "ℹ️ Default: 1 variant"
+    ;;
+esac
+
+echo "✅ Varianty na prompt: $num_variants"
+echo ""
+
+# ============================================================================
+# OTÁZKA 7: UPSCALING (OPTIONAL)
+# ============================================================================
+
+echo "❓ OTÁZKA 7: Chceš upscaling?"
+echo "  1. Nie ← DEFAULT"
+echo "  2. 2x upscale"
+echo "  3. 4x upscale"
+echo ""
+
+read -p "Voľba [1-3]: " upscale_choice
+upscale="none"  # Default
+
+case "$upscale_choice" in
+  1) upscale="none" ;;
+  2) upscale="2x" ;;
+  3) upscale="4x" ;;
+  *)
+    echo "ℹ️ Default: no upscaling"
+    ;;
+esac
+
+echo "✅ Upscaling: $upscale"
+echo ""
+
+# ============================================================================
+# OTÁZKA 8: CESTA ULOŽENIA
+# ============================================================================
+
+echo "❓ OTÁZKA 8: Kam chceš uložiť obrázky?"
+echo "  1. Aktuálny adresár (./) ← DEFAULT"
+echo "  2. Podadresár (./images/)"
+echo "  3. Custom cesta"
+echo ""
+
+read -p "Voľba [1-3]: " path_choice
+output_path="./images_generated"  # Default
+
+case "$path_choice" in
+  1)
+    output_path="."
+    ;;
+  2)
+    output_path="./images"
+    ;;
+  3)
+    read -p "Custom cesta: " output_path
+    if [[ -z "$output_path" ]]; then
+      output_path="./images_generated"
+    fi
+    ;;
+  *)
+    echo "ℹ️ Default: ./images_generated/"
+    ;;
+esac
+
+# Expand tilde
+output_path="${output_path/#\~/$HOME}"
+echo "✅ Output path: $output_path"
+echo ""
+
+# ============================================================================
+# FÁZA 1: PRÍPRAVA
+# ============================================================================
+
+echo "🔄 PRÍPRAVA:"
+echo ""
+
+# Calculate costs
+total_images=$((${#prompts[@]} * num_variants))
+base_cost=$(echo "$total_images * $model_price" | bc -l 2>/dev/null || echo "0.04")
+
+upscale_cost="0"
+if [[ "$upscale" != "none" ]]; then
+  upscale_cost=$(echo "$total_images * 0.05" | bc -l 2>/dev/null || echo "0.05")
+fi
+
+total_cost=$(echo "$base_cost + $upscale_cost" | bc -l 2>/dev/null || echo "$base_cost")
+remaining=$(echo "$credits - $total_cost" | bc -l 2>/dev/null || echo "$credits")
+
+# Display summary
+echo "📊 SUMMARY:"
+echo "  - Promptov: ${#prompts[@]}"
+echo "  - Variantov na prompt: $num_variants"
+echo "  - Celkem obrázkov: $total_images"
+echo "  - Model: $selected_model (\$$model_price per image)"
+echo "  - Aspect Ratio: $aspect_ratio"
+echo "  - Resolution: $resolution"
+if [[ "$upscale" != "none" ]]; then
+  echo "  - Upscaling: $upscale"
+fi
+echo ""
+
+echo "💰 CENA:"
+echo "  - Base: \$$base_cost"
+if [[ "$upscale" != "none" ]]; then
+  echo "  - Upscaling: \$$upscale_cost"
+fi
+echo "  - Total: \$$total_cost"
+echo ""
+
+echo "💳 KREDITY:"
+echo "  - Aktuálne: \$$credits"
+echo "  - Po generovaní: \$$remaining"
+echo ""
+
+# Final confirmation
+read -p "⚠️ Pokračovať? [YES/NO]: " confirm
+if [[ "$confirm" != "YES" ]]; then
+  echo "❌ Zrušené"
+  exit 0
+fi
+echo ""
+
+# ============================================================================
+# FÁZA 2: VALIDÁCIA A PRÍPRAVA VÝSTUPNÉHO ADRESÁRA
+# ============================================================================
+
+echo "✅ Príprava hotová, začínam generovanie..."
+echo ""
+
+# Ensure output directory exists
+if ! ensure_dir "$output_path"; then
+  echo "❌ ERROR: Could not create output directory"
+  exit 1
+fi
+
+# ============================================================================
+# FÁZA 3: GENERÁCIA OBRÁZKOV
+# ============================================================================
+
+# Main generation loop (simplified - AI bude implementovať kompletnú logiku)
+timestamp=$(get_timestamp)
+index=1
+
+for prompt in "${prompts[@]}"; do
+  for ((variant = 1; variant <= num_variants; variant++)); do
+    
+    echo "🎨 Generating [$index/$total_images]: $prompt (variant $variant/$num_variants)"
+    
+    # Call OpenRouter MCP
+    response=$(openrouter_generate-image \
+      --model "$selected_model" \
+      --prompt "$prompt" \
+      --size "$resolution" \
+      --aspect_ratio "$aspect_ratio" \
+      2>&1 || echo "")
+    
+    if [[ -z "$response" ]] || [[ "$response" == *"error"* ]]; then
+      echo "⚠️ Generation failed, continuing..."
+      ((index++))
+      continue
+    fi
+    
+    # Extract base64 from response
+    base64_data=$(echo "$response" | jq -r '.image.source.data // empty' 2>/dev/null || echo "")
+    
+    if [[ -z "$base64_data" ]]; then
+      echo "⚠️ No image data in response"
+      ((index++))
+      continue
+    fi
+    
+    # Save image
+    model_short=$(get_model_short_name "$selected_model")
+    png_file="${output_path}/image_${timestamp}_$(printf %03d $index)_${model_short}.png"
+    
+    if save_image "$base64_data" "$png_file"; then
+      echo "✅ Saved: $(basename "$png_file")"
+    else
+      echo "⚠️ Failed to save image"
+      ((index++))
+      continue
+    fi
+    
+    # Save metadata
+    metadata_file="${output_path}/image_${timestamp}_$(printf %03d $index)_${model_short}_metadata.json"
+    metadata=$(create_metadata_json "$(basename "$png_file")" "$prompt" "$selected_model" "gen-$index" "$model_price" "0")
+    echo "$metadata" > "$metadata_file"
+    
+    ((index++))
+  done
+done
+
+echo ""
+echo "✅ GENEROVANIE OBRÁZKOV - HOTOVO!"
+echo ""
+echo "📁 Obrázky uložené v: $output_path"
+echo "📊 Celkem vygenerovaných: $total_images"
+echo ""
 ```
-Chceš upscalovať obrázky?
-
-1. Nie (Bez upscalingu) ← DEFAULT
-   → Ponechám v pôvodnom rozlíšení
-
-2. Áno - Upscaluj na 2x
-   → Zdvojnásobí rozlíšenie
-   → Vylepší detaily, ostrosť
-   → Čas: +10-20s per obrázok
-   → Cena: ~$0.02-0.05 per obrázok
-
-3. Áno - Upscaluj na 4x
-   → 4× väčšie rozlíšenie
-   → Maximálna kvalita
-   → Čas: +20-30s per obrázok
-   → Cena: ~$0.04-0.08 per obrázok
-```
-
-**Logika Upscalingu:**
-```
-Ak Resolution = 1K (1536x864):
-  - 2x upscale → 3072x1728 (≈ 2K)
-  - 4x upscale → 6144x3456 (≈ 4K)
-
-Ak Resolution = 2K (3072x1728):
-  - 2x upscale → 6144x3456 (≈ 4K)
-  - 4x upscale → 12288x6912 (≈ 8K)
-```
-
-**Default:** Nie (bez upscalingu) - ak user nevyberie
-
----
-
-### OTÁZKA 8: Cesta Uloženia
-
-```
-Kam chceš uložiť obrázky?
-
-1. Aktuálny adresár (./)
-   → Ulož priamo sem
-   
-2. Podadresár (./images/)
-   → Ulož do ./images/ (vytvorí sa ak neexistuje)
-   
-3. Custom cesta
-   → Zadaj cestu (absolútnu alebo relatívnu)
-   → Príklady:
-      /home/user/generated-images
-      ./my-project/assets
-      ~/ai-images
-```
-
-**Štruktúra Výstupu:**
-```
-[Zvolená cesta]/
-├─ image_20260812_103000_001_dalle3.png
-├─ image_20260812_103000_001_dalle3_metadata.json
-├─ image_20260812_103000_002_dalle3.png
-├─ image_20260812_103000_002_dalle3_metadata.json
-├─ image_20260812_103000_003_seedream.png
-├─ image_20260812_103000_003_seedream_metadata.json
-└─ batch_summary_20260812_103000.json
-```
-
-**Validácia:**
-- Directory existence check
-- Write permissions check
-- Create directory if needed
-- Overwrite protection (ask before overwriting)
-
-**Default:** ./images_generated/ - ak user nevybiere custom cestu
 
 ---
 
