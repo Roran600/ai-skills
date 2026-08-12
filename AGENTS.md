@@ -21,6 +21,9 @@ ai-skills/
 ├── deep-research/          # Research assistant skill with EXA search
 │   ├── SKILL.md           # Instructions for conducting research and generating reports
 │   └── LICENSE.txt
+├── image-generation/       # Image generation skill with OpenRouter MCP
+│   ├── SKILL.md           # Instructions for generating images with batch, upscaling, reference images
+│   └── LICENSE.txt
 └── README.md              # Brief overview (Slovak)
 ```
 
@@ -33,6 +36,7 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - `markdown-formatter`: Slovenčina. Flexibilné formátovanie .txt súborov do bogatého markdownu.
 - `deep-factcheck`: Slovenčina. Fact-checking Hugo článkov s prioritizáciou 7 tvrdení.
 - `deep-research`: Slovenčina. Výskumný asistent s flexibilným výstupom a deduplikáciou.
+- `image-generation`: Slovenčina. Generovanie obrázkov cez OpenRouter MCP s batch, upscaling, reference images.
 - `frontend-design`: English. Emphasizes distinctive, opinionated design choices grounded in the subject matter.
 
 **Skill Frontmatter:**
@@ -45,6 +49,7 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - **markdown-formatter:** Converts plain `.txt` files to rich Markdown (.md or .md+frontmatter). Detects content type (articles, lists, mixed) and applies appropriate formatting. No file modifications - outputs new file.
 - **deep-factcheck:** Fact-checks Hugo articles by extracting 7 key claims and verifying them via EXA Search MCP. Generates detailed report with sources and recommended corrections. No automatic commits.
 - **deep-research:** Conducts research on any topic via EXA Search MCP. Generates flexible output (.txt, .md, or .md+frontmatter). Supports filtering (academic, technical, news), translation to Slovak, and detailed metadata. No automatic commits.
+- **image-generation:** Generates images via OpenRouter MCP with batch support, upscaling (2x/4x), reference images (max 5), and dynamic model selection (ranking by price). Auto-discovery of models, saves PNG + JSON metadata. No automatic commits.
 - **frontend-design:** No generated content; guidance only. Designed to be invoked as context, not output.
 
 ## Common Tasks
@@ -78,4 +83,4 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 
 ---
 
-Last updated: July 30, 2026
+Last updated: August 12, 2026
