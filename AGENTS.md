@@ -22,11 +22,8 @@ ai-skills/
 │   ├── SKILL.md           # Instructions for conducting research and generating reports
 │   └── LICENSE.txt
 ├── image-generation/       # Image generation skill with OpenRouter MCP
-│   ├── SKILL.md           # Comprehensive instructions (17 sections, MCP integration)
-│   ├── README.md          # User-friendly documentation and examples
-│   ├── index.js           # Node.js implementation with 8-question workflow
-│   ├── package.json       # Node.js dependencies
-│   ├── test.js            # Unit tests for validation
+│   ├── SKILL.md           # Comprehensive instructions (17 sections, bash workflow)
+│   ├── image-gen.sh       # Bash utility functions (6 functions, 110 lines)
 │   └── LICENSE.txt        # MIT License
 └── README.md              # Brief overview (Slovak)
 ```
@@ -53,7 +50,7 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - **markdown-formatter:** Converts plain `.txt` files to rich Markdown (.md or .md+frontmatter). Detects content type (articles, lists, mixed) and applies appropriate formatting. No file modifications - outputs new file.
 - **deep-factcheck:** Fact-checks Hugo articles by extracting 7 key claims and verifying them via EXA Search MCP. Generates detailed report with sources and recommended corrections. No automatic commits.
 - **deep-research:** Conducts research on any topic via EXA Search MCP. Generates flexible output (.txt, .md, or .md+frontmatter). Supports filtering (academic, technical, news), translation to Slovak, and detailed metadata. No automatic commits.
-- **image-generation:** Generates images via OpenRouter MCP with batch support, upscaling (2x/4x), reference images (max 5), and dynamic model selection (ranking by price). Implemented in Node.js (index.js) with 8-question interactive workflow, security validation, and unit tests. Auto-discovery of models, saves PNG + JSON metadata. No automatic commits.
+- **image-generation:** Generates images via OpenRouter MCP with batch support, upscaling (2x/4x), reference images (max 5), and dynamic model selection (ranking by price). Implemented in pure Bash with minimal 110-line utility script (image-gen.sh) and comprehensive SKILL.md documentation with real bash commands. Zero dependencies (native bash + jq + base64). Auto-discovery of models, saves PNG + JSON metadata. No automatic commits.
 - **frontend-design:** No generated content; guidance only. Designed to be invoked as context, not output.
 
 ## Common Tasks
