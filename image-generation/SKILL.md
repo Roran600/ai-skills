@@ -10,22 +10,45 @@ metadata:
 
 Si asistent na generovanie obrázkov cez OpenRouter MCP. Tvojou úlohou je:
 
-1. Fetchovať dostupné image generation modely z OpenRouter API
+1. Fetchovať dostupné image generation modely cez OpenRouter MCP
 2. Umožniť používateľovi vybrať si model (auto/manual/custom)
 3. Konfigurovať parametre generácie (aspect ratio, resolution, reference images)
-4. Podporovať batch generovanie (viacero promptov naraz)
-5. Umožniť upscaling vygenerovaných obrázkov
-6. Uložiť obrázky a metadáta na disk
-7. Poskytnúť detailnú štatistiku a post-action menu
+4. Generovať obrázky cez `openrouter_generate-image` MCP tool
+5. **ULOŽIŤ OBRÁZKY** z inline image content block na disk (base64 decode)
+6. Podporovať batch generovanie (viacero promptov naraz)
+7. Umožniť upscaling vygenerovaných obrázkov
+8. Uložiť obrázky + metadáta na disk
+9. Poskytnúť detailnú štatistiku a post-action menu
 
 ---
 
 ## 1. KONTEXT A BEZPEČNOSŤ (STRIKTNÉ)
 
 ### Pracovný Priestor
-- Pracuješ s obrázkami, metadátami a OpenRouter MCP API
+- Pracuješ s obrázkami, metadátami a OpenRouter MCP
 - Obrázky sú NOVÉ súbory (nie zmeny v projekte)
 - Pracuješ v aktuálnom adresári alebo v zadanom custom priečinku
+- **ŽIADNY API key v kóde** - OpenCode OAuth spravuje autentifikáciu
+
+### Autentifikácia (OpenCode OAuth)
+```
+✅ OpenCode má OpenRouter MCP skonfigurované
+✅ User autentifikuje OAuth pri prvom použití
+✅ OpenCode spravuje OAuth tokeny bezpečne
+✅ Skill NEPOTREBUJE environment variable s API key
+✅ Skill VOLÁ MCP TOOLS s automatickou autentifikáciou
+
+Sekcia v ~/.config/opencode/opencode.json:
+{
+  "mcp": {
+    "openrouter": {
+      "type": "remote",
+      "url": "https://mcp.openrouter.ai/mcp",
+      "enabled": true
+    }
+  }
+}
+```
 
 ### Git Check (INFORMÁCIA)
 ```
@@ -38,7 +61,7 @@ PRED začatím:
 
 ### Credit Validation (BEZPEČNOSŤ)
 ```
-1. openrouter_get-credits → Check dostupný balance
+1. openrouter_get-credits → Check dostupný balance (MCP tool)
 2. Kalkuluj očakávanú cenu (podľa počtu promptov × variantov × model price)
 3. WARNING: Ak < $0.50 kreditu
 4. ERROR + STOP: Ak $0 kreditu
@@ -80,18 +103,17 @@ PRED začatím:
 
 ---
 
-## 2. MODEL DISCOVERY - DYNAMICKÉ (API)
+## 2. MODEL DISCOVERY - DYNAMICKÉ (MCP)
 
 ### Auto-Discovery pri Spustení Skillu
 
-Skill **vždy** fetchuje dostupné modely z OpenRouter API:
+Skill **vždy** fetchuje dostupné modely cez OpenRouter MCP:
 
 ```
-openrouter_list-models(
+openrouter_list-models (MCP tool)
   output_modalities: "image",
   sort: "pricing-low-to-high",
   limit: 50
-)
 ```
 
 **Vracia:**
@@ -106,7 +128,7 @@ openrouter_list-models(
 
 **Pri Automatickom Výbere:**
 ```
-1. Fetch ALL image modely z API
+1. Fetch ALL image modely cez MCP tool
 2. Sort by PRICE (ASC - lacnejší = recommended)
 3. Filter: supported_parameters musí obsahovať:
    - aspect_ratio (alebo flexibility)
@@ -117,7 +139,7 @@ openrouter_list-models(
 
 **Pri Manuálnom Výbere:**
 ```
-1. Fetch ALL image modely z API
+1. Fetch ALL image modely cez MCP tool
 2. Sort by PRICE (ASC)
 3. Display: TOP 15 modelov s detailami:
    - Poradie (1-15)
@@ -131,6 +153,8 @@ openrouter_list-models(
 4. User interakcia:
    - Voľba čísla (1-15) → Select TOP N model
    - Alebo priame zadanie: "openai/dall-e-3" → Custom model
+   
+✅ Všetky volania cez MCP tools - autentifikácia z OpenCode OAuth
 ```
 
 ---
@@ -512,64 +536,110 @@ Kam chceš uložiť obrázky?
 
 ---
 
-## 5. FÁZA 4: GENERÁCIA OBRÁZKOV
+## 5. FÁZA 4: GENERÁCIA OBRÁZKOV (MCP + INLINE IMAGE SAVE)
 
 ### Main Generation Loop
 
 ```
 FOR EACH prompt IN prompts:
-    FOR EACH variant IN range(num_variants):
-        
-        # 1. Call Generation API
-        image_base64, metadata = openrouter_generate-image(
-            model=selected_model,
-            prompt=prompt,
-            aspect_ratio=ratio,
-            size=resolution,
-            reference_images=refs (if any),
-            n=1
-        )
-        
-        # 2. Progress Update
-        Ukáž: "Generovanie [X]/[TOTAL] obrázkov..."
-        
-        # 3. Save PNG
-        filename = f"image_{timestamp}_{index:03d}_{model_short}.png"
-        Save image_base64 → PNG file
-        
-        # 4. Generate Metadata
-        metadata_json = {
-            "filename": filename,
-            "prompt": prompt,
-            "model": model,
-            "aspect_ratio": ratio,
-            "resolution": actual_pixels,
-            "generation_time_ms": duration,
-            "cost_usd": cost,
-            "timestamp": ISO_timestamp,
-            "reference_images": refs,
-            "batch_info": {...}
-        }
-        Save metadata_json → JSON file
-        
-        # 5. Conditional Upscaling
-        IF upscale:
-            upscaled_image = apply_upscale(image_base64, scale_factor)
-            upscaled_filename = f"{filename_without_ext}_upscaled.png"
-            Save upscaled_image → PNG
-            Update metadata (upscaled: true, factor: 2x/4x)
+     FOR EACH variant IN range(num_variants):
+         
+         # 1. Call Generation MCP Tool
+         response = openrouter_generate_image(
+             model=selected_model,
+             prompt=prompt,
+             size=resolution
+         )
+         # MCP vracia: { image: {...}, metadata: {...}, generation_id: "gen-xyz" }
+         
+         # 2. Progress Update
+         Ukáž: "Generovanie [X]/[TOTAL] obrázkov..."
+         
+         # 3. Extract Image from Inline Content Block
+         base64_data = response.image.source.data
+         # response.image.source = { type: "base64", media_type: "image/png", data: "iVBORw0KGgo..." }
+         
+         # 4. Decode Base64 → Binary PNG
+         png_binary = Buffer.from(base64_data, 'base64')
+         
+         # 5. Save PNG to Disk
+         filename = f"image_{timestamp}_{index:03d}_{model_short}.png"
+         writeFileSync(output_path/filename, png_binary)
+         
+         # 6. Generate Metadata (s generation_id z MCP)
+         metadata_json = {
+             "filename": filename,
+             "prompt": prompt,
+             "model": model,
+             "generation_id": response.metadata.generation_id,  ← Z MCP response
+             "aspect_ratio": ratio,
+             "resolution": resolution,
+             "generation_time_ms": response.metadata.duration_ms,
+             "cost_usd": response.metadata.cost,
+             "timestamp": ISO_timestamp,
+             "source": "openrouter-mcp-inline"
+         }
+         Save metadata_json → JSON file
+         
+         # 7. Conditional Upscaling (ak user vybral)
+         IF upscale:
+             upscaled_image = apply_upscale(png_binary, scale_factor)
+             upscaled_filename = f"{filename_without_ext}_upscaled_{scale_factor}.png"
+             writeFileSync(output_path/upscaled_filename, upscaled_image)
+             Update metadata (upscaled: true, factor: 2x/4x)
+```
+
+### MCP Response Structure (Čo dostaneme)
+
+```json
+{
+  "image": {
+    "type": "image",
+    "source": {
+      "type": "base64",
+      "media_type": "image/png",
+      "data": "iVBORw0KGgoAAAANSUhEUgAA..." ← BASE64 PNG DATA
+    }
+  },
+  "metadata": {
+    "generation_id": "gen-abc123xyz",
+    "cost": 0.08,
+    "duration_ms": 45000,
+    "provider": "together",
+    "tokens": {
+      "prompt": 42,
+      "completion": 0
+    }
+  }
+}
+```
+
+### Image Extraction + Save Flow
+
+```python
+# Step 1: Extract base64 from inline image content block
+base64_string = response['image']['source']['data']
+
+# Step 2: Decode base64 → binary PNG bytes
+png_bytes = base64.b64decode(base64_string)
+
+# Step 3: Write binary to disk
+with open(output_filepath, 'wb') as f:
+    f.write(png_bytes)
+
+# Result: PNG file uložený na disku
 ```
 
 ### Error Handling
 
 ```
 TRY:
-    Generate image with selected_model
-CATCH generation_error:
+    Call openrouter_generate_image() via MCP
+CATCH mcp_error:
+    Log: "Generation failed: [error]"
     IF retry_count < 2:
-        Retry (auto-retry 2x)
+        Retry (auto-retry 2x s exponential backoff)
     ELSE:
-        Log error
         IF available_fallback_model:
             Suggest & use cheaper model
             Continue
@@ -578,18 +648,24 @@ CATCH generation_error:
             Continue to next
 
 TRY:
-    Upscale image
-CATCH upscale_error:
-    Keep original image
-    Mark upscale as failed in metadata
-    Log warning
+    Decode base64 from response
+CATCH decode_error:
+    Log: "Base64 decode failed"
+    Mark image as failed in metadata
     Continue to next
 
 TRY:
-    Save files to disk
+    Write PNG to disk
 CATCH io_error:
-    ERROR: "Cannot write to [path]"
-    Stop generation
+    ERROR: "Cannot write to [path] - [reason]"
+    Stop generation (kritická chyba)
+
+TRY:
+    Apply upscaling (ak vybraný)
+CATCH upscale_error:
+    Keep original image
+    Mark upscale as failed in metadata
+    Continue to next
 ```
 
 ---
@@ -602,8 +678,9 @@ CATCH io_error:
     {
       "filename": "image_20260812_103000_001_dalle3.png",
       "prompt": "A futuristic city at sunset with neon lights",
-      "prompt_expanded": "[Expanded version ak sa použil auto-expand]",
       "model_used": "openai/dall-e-3",
+      "generation_id": "gen-abc123xyz",
+      "source": "openrouter-mcp-inline",
       "aspect_ratio": "16:9",
       "resolution": {
         "requested": "1K",
@@ -611,10 +688,6 @@ CATCH io_error:
         "upscaled": false,
         "upscale_factor": null
       },
-      "reference_images_used": [
-        "/home/user/ref1.png",
-        "https://example.com/ref2.jpg"
-      ],
       "generation": {
         "timestamp": "2026-08-12T10:30:00Z",
         "duration_ms": 45000,
@@ -625,8 +698,7 @@ CATCH io_error:
         "applied": false,
         "factor": null,
         "duration_ms": null,
-        "cost_usd": null,
-        "model_used": null
+        "cost_usd": null
       },
       "batch_info": {
         "batch_id": "batch_20260812_103000",
@@ -637,15 +709,23 @@ CATCH io_error:
       }
     },
     {
-      "filename": "image_20260812_103000_001_dalle3_upscaled.png",
+      "filename": "image_20260812_103000_001_dalle3_upscaled_2x.png",
       "prompt": "A futuristic city at sunset with neon lights",
       "model_used": "openai/dall-e-3",
+      "generation_id": "gen-abc123xyz",
+      "source": "openrouter-mcp-inline",
       "aspect_ratio": "16:9",
       "resolution": {
         "requested": "1K",
         "actual_pixels": "1536x864",
         "upscaled": true,
         "upscale_factor": "2x"
+      },
+      "generation": {
+        "timestamp": "2026-08-12T10:30:00Z",
+        "duration_ms": 45000,
+        "cost_usd": 0.08,
+        "provider": "together"
       },
       "upscaling": {
         "applied": true,
@@ -761,20 +841,27 @@ Po úspešnom generovaní:
   Aspect Ratio: 16:9
   Resolution: 1K (1536x864)
   Upscaling: 2x (3072x1728)
-  Reference Images: 2
 
-📁 ULOŽENÉ V:
-  → /home/user/images_generated/
-
-🖼️  TOP 3 OBRÁZKY:
-  1. image_20260812_103000_001_dalle3.png
+🖼️  OBRÁZKY ULOŽENÉ:
+  ✅ image_20260812_103000_001_dalle3.png (255 KB)
      "A futuristic city at sunset with neon lights"
+     → Metadata: image_20260812_103000_001_dalle3_metadata.json
+     → Upscaled: image_20260812_103000_001_dalle3_upscaled_2x.png (750 KB)
   
-  2. image_20260812_103000_002_dalle3.png
+  ✅ image_20260812_103000_002_dalle3.png (248 KB)
      "Minimalist white room with plants"
+     → Metadata: image_20260812_103000_002_dalle3_metadata.json
   
-  3. image_20260812_103000_003_seedream.png
+  ✅ image_20260812_103000_003_seedream.png (265 KB)
      "Abstract geometric patterns"
+     → Metadata: image_20260812_103000_003_seedream_metadata.json
+     → Upscaled: image_20260812_103000_003_seedream_upscaled_2x.png (780 KB)
+
+📁 MIESTO ULOŽENIA:
+   /home/user/images_generated/
+
+📋 BATCH SUMMARY:
+   batch_summary_20260812_103000.json
 
 💰 KREDITY:
   Pred: $2.50
@@ -784,7 +871,7 @@ Po úspešnom generovaní:
 ---
 
 ⚠️  GIT:
-  ❌ Skill NEUKLADAL automaticky do Gitu
+  ❌ Skill NEUKLADAL obrázky do Gitu
   ✅ Obrázky sú nové súbory - môžeš si ich commitnúť ručne ak chceš
 
 📋 ĎALŠIE MOŽNOSTI:
