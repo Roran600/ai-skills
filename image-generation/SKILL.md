@@ -54,6 +54,7 @@ Tento skill je **bash-only**. Všetko beží cez OpenRouter MCP (`tools/call gen
 5) **Generovanie (platené)**
    - `./img.sh gen -m <model> -r <pomer> -q <tier> -o <outdir> "prompt1" "prompt2"`
    - Alebo `-f prompts.txt` (1 prompt na riadok; posledný riadok bez newline sa **nestratí**).
+   - `gen` je čisto neinteraktívny – na adresár sa **nepýta**, bez `-o` píše do `./out`. Interaktívny výber cesty rieši `menu`.
    - `--upscale 2|4` upscaluje aj každý vytvorený obrázok.
    - Každý prompt = jeden platený MCP call (MCP nemá `n`). Pred batchom oznám userovi počet callov a model.
    - Výstup v `<outdir>`:
@@ -73,7 +74,23 @@ Tento skill je **bash-only**. Všetko beží cez OpenRouter MCP (`tools/call gen
 
 ## Interaktívne menu
 
-`./img.sh menu` – hub, ktorý drží stav a vracia sa doň po každej zmene:
+`./img.sh menu` – hub, ktorý drží stav a vracia sa doň po každej zmene.
+
+**Prvá otázka session je, kam sa obrázky uložia.** Padne pred menu, aby výstup nikdy neskončil v náhodnom adresári:
+
+```
+  Where should the images be saved?
+    1) current directory  : /home/user/projekt
+    2) custom path...
+    3) ./out subdirectory : /home/user/projekt/out
+  choice [1]:
+```
+
+- Enter = **1**, teda aktuálny adresár.
+- `2` sa dopýta na cestu. Rozbalí `~`, adresár vytvorí (`mkdir -p`), overí zápis a uloží **absolútnu** cestu.
+- Neplatná cesta (existuje ako súbor, nedá sa vytvoriť, nie je zapisovateľná) vypíše chybu a otázka sa zopakuje. Nič sa nezaplatilo.
+- `q` tu skript ukončí.
+- **Ak si dal `-o <cesta>` na príkazovej riadke, otázka sa preskočí.**
 
 ```
 1) Model            : black-forest-labs/flux.2-klein-4b   [auto: lowest catalogue price]
@@ -83,7 +100,7 @@ Tento skill je **bash-only**. Všetko beží cez OpenRouter MCP (`tools/call gen
 5) Prompts          : 2
 6) Upscale after gen: 2
 7) Upscale an existing image...
-8) Output dir       : ./out
+8) Output dir       : /home/user/projekt
 g) Generate         (2 paid call(s))
 q) Quit
 ```
@@ -94,6 +111,7 @@ q) Quit
 - **5 Prompts** – pridať, editovať v `$EDITOR`, načítať zo súboru, zmazať.
 - **6** – upscale výstupov po generovaní (`off/2/4`).
 - **7** – upscale existujúceho obrázka alebo globu, **bez** generovania.
+- **8 Output dir** – ten istý picker ako pri štarte, plus `b` = ponechať súčasnú cestu. Rovnaká validácia.
 - **g** – potvrdenie pred platbou. Zablokuje sa, ak nie je model alebo prompt. Cenu **pred** callom neodhaduje (katalóg je nepoužiteľný), po calle vypíše skutočnú. Po dobehnutí vypíše ekvivalentný `gen`/`menu` príkaz na reprodukciu.
 
 ## Neinteraktívny režim (pre agenta)
@@ -107,6 +125,7 @@ q) Quit
 
 - Bez `--yes` = **dry-run**: vypíše rozhodnutý plán vrátane finálnych promptov so vloženým ref briefom. Neplatí nič.
 - S `--yes` generuje. Pred callmi vypíše počet a model.
+- **Na výstupný adresár sa nikdy nepýta** – bez `-o` použije `./out`. Otázka o adresári je len v interaktívnom režime.
 - `--max-calls N` (default **4**) je poistka proti prepáleniu peňazí v smyčke. Viac promptov než limit = odmietnutie.
 - `--ref` a `--ref-desc` sa párujú **poradím**.
 
@@ -142,6 +161,7 @@ Bez TTY a bez `--non-interactive` skript **odmietne** bežať (exit 2), aby agen
 
 ## Testovací hook
 - `IMG_ASSUME_TTY=1` obíde TTY guard, aby sa interaktívna smyčka dala testovať skriptovaným stdin. Nepoužívaj na generovanie.
+- Pozor: prvý riadok skriptovaného stdin zhltne **otázka o výstupnom adresári**. Buď ju obsluž (`1` = cwd), alebo ju vynechaj cez `-o <cesta>`.
 
 ## Licencia
 MIT (pozri LICENSE.txt)

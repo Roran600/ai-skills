@@ -54,6 +54,11 @@ menu options (non-interactive contract for agents):
   --no-palette         Omit hex palette from the reference brief
   --upscale 2|4
 
+Output directory:
+  Interactive `menu` asks where to save first thing: current directory (default),
+  a custom path, or ./out. Passing -o/--out skips that question. Non-interactive
+  runs never ask and fall back to ./out.
+
 menu exit codes:
   0   ok / dry-run
   2   no TTY and --non-interactive not given
@@ -503,6 +508,7 @@ M_MODEL_SRC="unset"
 M_RATIO="1:1"
 M_TIER="1K"
 M_OUTDIR="./out"
+M_OUTDIR_SET=0
 M_UPSCALE=""
 M_PALETTE=1
 M_MAXCALLS=4
@@ -736,6 +742,52 @@ menu_upscale_existing() {
   done
 }
 
+# ---------------------------------------------------------------- output dir
+
+# Expands ~, creates the directory, verifies it is writable, prints the absolute
+# path. Returns 1 instead of dying so the picker can re-ask.
+resolve_outdir() {
+  local p=${1:-}
+  [[ -n "$p" ]] || { err "empty path"; return 1; }
+  p="${p/#\~/$HOME}"
+  if [[ -e "$p" && ! -d "$p" ]]; then err "exists but is not a directory: $p"; return 1; fi
+  mkdir -p "$p" 2>/dev/null || { err "cannot create directory: $p"; return 1; }
+  [[ -w "$p" ]] || { err "directory is not writable: $p"; return 1; }
+  (cd -- "$p" && pwd)
+}
+
+# mode: initial (asked once at menu startup) | change (reached from the menu)
+menu_pick_outdir() {
+  local mode=${1:-change} c path resolved
+  while true; do
+    ui ""
+    ui "  Where should the images be saved?"
+    printf "    1) current directory  : %s\n" "$PWD" >&2
+    ui  "    2) custom path..."
+    printf "    3) ./out subdirectory : %s\n" "$PWD/out" >&2
+    [[ "$mode" == "change" ]] && ui "    b) keep $M_OUTDIR"
+    ask c "  choice [1]: " "1"
+    path=""
+    case "${c:-1}" in
+      1) path="$PWD";;
+      2) ask path "  path: " ""
+         [[ -n "$path" ]] || { err "no path given"; continue; };;
+      3) path="$PWD/out";;
+      b|B) if [[ "$mode" == "change" ]]; then return 0; fi
+           err "unknown choice: $c"; continue;;
+      q|Q) if [[ "$mode" == "initial" ]]; then ui "  bye, nothing spent"; exit 0; fi
+           err "unknown choice: $c"; continue;;
+      *) err "unknown choice: $c"; continue;;
+    esac
+    if resolved=$(resolve_outdir "$path"); then
+      M_OUTDIR=$resolved
+      M_OUTDIR_SET=1
+      info "  images -> $M_OUTDIR"
+      return 0
+    fi
+  done
+}
+
 menu_summary() {
   local size calls
   size=$(cmd_size "$M_RATIO" "$M_TIER" 2>/dev/null || echo "?")
@@ -756,7 +808,7 @@ menu_summary() {
 }
 
 menu_equivalent_cmd() {
-  local out="./img.sh menu --non-interactive --yes -m ${M_MODEL:-MODEL} -r $M_RATIO -q $M_TIER -o $M_OUTDIR"
+  local out="./img.sh menu --non-interactive --yes -m ${M_MODEL:-MODEL} -r $M_RATIO -q $M_TIER -o $(printf '%q' "$M_OUTDIR")"
   [[ -n "$M_UPSCALE" ]] && out="$out --upscale $M_UPSCALE"
   (( M_PALETTE )) || out="$out --no-palette"
   local i
@@ -829,7 +881,7 @@ cmd_menu() {
       -m|--model) M_MODEL=${2:-}; M_MODEL_SRC="flag"; shift 2;;
       -r|--ratio) M_RATIO=${2:-}; shift 2;;
       -q|--tier)  M_TIER=${2:-}; shift 2;;
-      -o|--out)   M_OUTDIR=${2:-}; shift 2;;
+      -o|--out)   M_OUTDIR=${2:-}; M_OUTDIR_SET=1; shift 2;;
       --prompt)   M_PROMPTS+=("${2:-}"); shift 2;;
       --ref)      M_REF_PATHS+=("${2:-}"); shift 2;;
       --ref-desc) M_REF_DESCS+=("${2:-}"); shift 2;;
@@ -876,6 +928,9 @@ cmd_menu() {
     exit $EX_NO_TTY
   fi
 
+  # First question of the session: where do the images go. Skipped when -o was given.
+  (( M_OUTDIR_SET )) || menu_pick_outdir initial
+
   while true; do
     menu_summary
     local c; ask c "  choice: " ""
@@ -888,7 +943,7 @@ cmd_menu() {
       6) local u; ask u "  upscale after gen (off/2/4) [off]: " "off"
          case "${u:-off}" in off|"") M_UPSCALE="";; 2) M_UPSCALE=2;; 4) M_UPSCALE=4;; *) err "off, 2 or 4";; esac;;
       7) menu_upscale_existing;;
-      8) local d; ask d "  output dir: " "$M_OUTDIR"; [[ -n "$d" ]] && M_OUTDIR="${d/#\~/$HOME}";;
+      8) menu_pick_outdir change;;
       g|G)
         if [[ -z "$M_MODEL" ]]; then err "pick a model first (option 1)"; continue; fi
         if (( ${#M_PROMPTS[@]} == 0 )); then err "add at least one prompt first (option 5)"; continue; fi
