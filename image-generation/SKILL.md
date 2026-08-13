@@ -1,6 +1,6 @@
 ---
 name: image-generation
-description: "Generovanie obrázkov cez OpenRouter MCP v bashi, s výberom modelu, aspektmi, batch a upscalingom"
+description: "Vygeneruj obrázok / nakresli / ilustrácia / logo / banner / generate image – cez OpenRouter MCP bash skriptom img.sh (batch, upscaling, referencie)"
 license: MIT
 compatibility:
   mcp: openrouter
@@ -9,74 +9,118 @@ metadata:
   workflow: "CLI / bash"
 ---
 
-# Pokyny (slovensky)
+# Generovanie obrázkov
 
-Tento skill je **bash-only**. Všetko beží cez OpenRouter MCP (`tools/call generate-image`), bez REST API a bez SDK. Autentifikácia používa token, ktorý už má OpenCode uložený.
+## Agent: spusti presne toto
 
-## Predpoklady
-- Závislosti: `curl`, `jq`, `base64`, `awk`, `magick` (ImageMagick) – všetko je v prostredí.
-- Token: automaticky sa načíta z `~/.local/share/opencode/mcp-auth.json` (`openrouter.tokens.accessToken`). Ak chýba, nastav `OPENROUTER_API_KEY` v env. Skript vypíše chybu, nikdy token nevypíše.
+Pravidlá, ktoré platia nad všetkým ostatným v tomto súbore:
 
-## Kontrakt výstupu
-- **stdout** = iba cesty k vytvoreným súborom (jedna na riadok). Preto `files=$(./img.sh gen ...)` funguje.
-- **stderr** = UI, diagnostika, chyby, otázky.
-- Výnimka: `menu --dry-run` dáva plán na stdout, lebo plán je požadovaný výstup.
+- **Toto nie je text na prerozprávanie.** Príkazy nižšie spusti Bash toolom.
+- **Hotovo je až vtedy, keď na disku existuje súbor s obrázkom.** Nie keď vieš, ako by sa vygeneroval.
+- **Nikdy neodovzdaj výstup `plan (nothing has been generated yet):` ako výsledok.** To je dry-run, obrázok pri ňom nevznikne.
 
-## Kroky použitia
+### 1. Nájdi skript (raz na session)
 
-1) **Schéma nástrojov (zadarmo)** – `./img.sh mcp tools/list | jq '.result.tools[] | select(.name=="generate-image")'`
-   - Live stav (overené): `model`, `prompt`, `size`. Žiadne `aspect_ratio`, `input_references`, `n`, `seed`.
+```bash
+IMG=$(find ~/.config/opencode/skills ~/.claude/skills ~/.agents/skills \
+  .opencode/skills .claude/skills .agents/skills \
+  -maxdepth 2 -name img.sh -type f 2>/dev/null | head -1); echo "IMG=${IMG:-NOT FOUND}"
+```
 
-2) **Výber modelu**
-   - Auto: `./img.sh models` (živý katalóg, `output_modalities=image`).
-   - Manuál: slug od usera, over cez `./img.sh mcp get-model '{"request":{"author":"<author>","slug":"<slug>"}}'`.
-   - **Pozor na cenu:** stĺpec s cenou je `image_output` z katalógu a **nie je to cena za obrázok**. Reálny call na `flux.2-klein-4b` stál podľa MCP `$0.015`, katalóg uvádza `$0.0000034`. Nikdy neuvádzaj userovi katalógovú hodnotu ako cenu za obrázok. Skutočnú cenu vypíše `gen` po calle a uloží ju do sidecaru.
-   - API sort `pricing-low-to-high` je pre image modely bezcenný (prompt price je `$0/M` u všetkých), preto `./img.sh models` triedi lokálne podľa rozparsovanej ceny.
+- Vypíše cestu → pokračuj krokom 2.
+- Vypíše `IMG=NOT FOUND` → oznám userovi, že skript skillu sa nenašiel, a skonči. Nič si nevymýšľaj.
+- `$IMG` drží hodnotu v tej istej bash session. Keď neskôr príkaz spadne na `No such file`, spusti tento resolve znova.
+- **Nikdy nepíš `./img.sh`.** Skript nie je v pracovnom adresári usera ani na `PATH`; relatívna cesta vždy zlyhá.
 
-3) **Pomer a veľkosť**
-   - `./img.sh size <pomer> <tier>` → reťazec pre MCP `size`.
-   - Tiers: `1K|2K|4K` (standard/high/ultra). Pri 1:1 sa vracia natívny tier (`1K`), inak explicitné pixely (area-preserving, /8).
-   - Overené rozmery:
-     - 16:9 → 1K `1368x768`, 2K `2728x1536`, 4K `5464x3072`
-     - 9:16 → 1K `768x1368`, 2K `1536x2728`, 4K `3072x5464`
-     - 4:3 → 1K `1184x888`, 2K `2368x1776`, 4K `4728x3544`
-     - 3:4 → 1K `888x1184`, 2K `1776x2368`, 4K `3544x4728`
-     - 21:9 → 1K `1568x672`, 2K `3128x1344`, 4K `6256x2680`
-   - **Provider rozmer zaokrúhľuje.** Žiadané `1368x768` vrátilo `1360x768`. Neber požadovanú veľkosť ako garanciu.
+### 2. Vygeneruj
 
-4) **Referenčné obrázky (MCP ich neprijíma)**
-   - `generate-image` nemá pole pre obrázok, takže referencia sa **musí** stať textom v prompte. Ide o **štýlovú podobnosť, nie img2img**.
-   - Všetkých 40 image modelov v katalógu má `input_modalities: [text, image]` – blokuje to MCP surface, nie modely.
-   - `send-message` berie iba text, takže skript si referenciu **nemôže** dať opísať vision modelom.
-   - `./img.sh reffacts <obrázok>` vytiahne objektívne fakty (paleta, rozmer, aspect, orientácia, jasnosť `L`, saturácia `S`) ako JSON. Subjekt a štýl musí opísať človek alebo agent.
-   - Ako agent: obrázok si prečítaj Read toolom a opis vlož do `--ref-desc`: subjekt + akcia, kompozícia/uhol, paleta + svetlo, médium/štýl.
+```bash
+"$IMG" menu --non-interactive --yes \
+  -m black-forest-labs/flux.2-klein-4b -r 16:9 -q 2K -o . \
+  --prompt "<prompt po anglicky, konkrétny: subjekt, kompozícia, svetlo, štýl>"
+```
 
-5) **Generovanie (platené)**
-   - `./img.sh gen -m <model> -r <pomer> -q <tier> -o <outdir> "prompt1" "prompt2"`
-   - Alebo `-f prompts.txt` (1 prompt na riadok; posledný riadok bez newline sa **nestratí**).
-   - `gen` je čisto neinteraktívny – na adresár sa **nepýta**, bez `-o` píše do `./out`. Interaktívny výber cesty rieši `menu`.
-   - `--upscale 2|4` upscaluje aj každý vytvorený obrázok.
-   - Každý prompt = jeden platený MCP call (MCP nemá `n`). Pred batchom oznám userovi počet callov a model.
-   - Výstup v `<outdir>`:
-     - `NN-<model>.<ext>` – obrázok. **Prípona podľa magic bytes**, nie vždy PNG (flux vracia JPEG). Pri viac obrázkoch z jednej odpovede `NN-<model>-01.<ext>`, `-02` atď.
-     - `NN-<model>.json` – sidecar: model, prompt, size, created, cost, tokens, status, files, upscaled, refs.
-     - `raw/NN-<model>.raw.json` – odpoveď MCP. Ukladá sa **pred** parsovaním, takže zaplatený obrázok sa nestratí. Po úspechu sa base64 vystrihne, zostanú metadáta. Pri chybe zostáva celá, aby sa obrázok dal zachrániť.
-   - Raw je v podadresári, aby `<outdir>/*.json` matchovalo iba sidecary.
-   - **Batch pokračuje po chybe.** Jedno zlyhanie nezhodí ostatné prompty; `gen` vráti nenulový kód a vypíše súhrn. Zlyhaný sidecar má `status: "failed"`.
+- `--yes` je **povinné**. Bez neho skript iba vypíše plán a nič nevygeneruje.
+- `-o .` ukladá do aktuálneho adresára. Ak user povedal iný adresár, daj tam jeho cestu.
+- Jeden prompt = jeden platený MCP call, reálne ≈ `$0.015`. **Pri jednom obrázku nerob dry-run, generuj hneď.**
+- Model neriešiš, ak user nemá požiadavku – default vyššie je funkčný a lacný.
 
-6) **Extrakcia base64 → súbory**
-   - `./img.sh extract <file|-> [outdir] [basename]`
-   - Vie MCP `CallToolResult`, `ImageContent`, `b64_json`, data URL aj holý base64. Príponu určí podľa magic bytes, poradie viacerých obrázkov zachová.
-   - Ak MCP vrátil chybu (`isError`), vypíše **skutočný text chyby**, nie „no image found".
+### 3. Ohlás výsledok
 
-7) **Upscaling (resample)**
-   - `./img.sh upscale img.jpg 2` (alebo `4`). Lanczos + unsharp. Nie je to generatívny super-res, len resampling.
+- Skript vypíše `IMAGE(S) CREATED:` a cesty k súborom. Tie cesty daj userovi.
+- Skutočnú cenu vezmi z riadku `Done: ... Actual cost reported by MCP: $X`.
+- Ak vypíše `NO IMAGE WAS CREATED` alebo sidecar má `status: "failed"`, povedz konkrétnu chybu. Nepredstieraj úspech.
 
-## Interaktívne menu
+## Viac obrázkov naraz (batch)
 
-`./img.sh menu` – hub, ktorý drží stav a vracia sa doň po každej zmene.
+Pri **2 a viac** promptoch najprv over plán bez `--yes`:
 
-**Prvá otázka session je, kam sa obrázky uložia.** Padne pred menu, aby výstup nikdy neskončil v náhodnom adresári:
+```bash
+"$IMG" menu --non-interactive -m <model> -r 16:9 -q 2K -o . \
+  --prompt "prvý" --prompt "druhý"
+```
+
+Potom oznám userovi počet platených callov a model, a spusti ten istý príkaz s `--yes`.
+`--max-calls N` (default **4**) je strop proti prepáleniu peňazí; viac promptov než limit skript odmietne.
+
+## Výber modelu
+
+- Default: `black-forest-labs/flux.2-klein-4b`.
+- Živý katalóg: `"$IMG" models | head -5` (najlacnejšie prvé, `output_modalities=image`).
+- Slug od usera over zadarmo: `"$IMG" mcp get-model '{"request":{"author":"<author>","slug":"<slug>"}}'`.
+- **Cena v katalógu nie je cena za obrázok.** Je to `image_output` za token. Reálny call na `flux.2-klein-4b` stál `$0.015`, katalóg uvádza `$0.0000034`. Userovi nikdy neuvádzaj katalógovú hodnotu ako cenu za obrázok – použi skutočnú cenu z výstupu `gen`.
+
+## Pomer a veľkosť
+
+`"$IMG" size <pomer> <tier>` vráti reťazec pre MCP `size`. Tiers `1K|2K|4K`, pomery `1:1 16:9 9:16 4:3 3:4 21:9`.
+
+| pomer | 1K | 2K | 4K |
+|-------|----|----|----|
+| 16:9 | 1368x768 | 2728x1536 | 5464x3072 |
+| 9:16 | 768x1368 | 1536x2728 | 3072x5464 |
+| 4:3 | 1184x888 | 2368x1776 | 4728x3544 |
+| 3:4 | 888x1184 | 1776x2368 | 3544x4728 |
+| 21:9 | 1568x672 | 3128x1344 | 6256x2680 |
+
+Pri `1:1` sa posiela natívny tier (`1K`). **Provider rozmer zaokrúhľuje** – žiadané `1368x768` vrátilo `1360x768`, neber požadovanú veľkosť ako garanciu.
+
+## Referenčné obrázky
+
+MCP `generate-image` **neprijíma obrázky**, iba `model`, `prompt`, `size`. Referencia sa preto musí stať textom v prompte – ide o **štýlovú podobnosť, nie img2img**.
+
+```bash
+"$IMG" reffacts <obrázok>        # objektívne fakty: paleta, rozmer, aspect, jasnosť, saturácia
+"$IMG" menu --non-interactive --yes -m <model> -o . \
+  --ref <obrázok> --ref-desc "subjekt + akcia, kompozícia/uhol, paleta + svetlo, médium/štýl" \
+  --prompt "<prompt>"
+```
+
+- `--ref` a `--ref-desc` sa párujú **poradím**.
+- `--ref` bez `--ref-desc` skončí exitom **10**, zapíše `<outdir>/refs.pending.json` a **nič nezaplatí**. Vtedy: obrázok si prečítaj Read toolom, doplň popis a spusti znova.
+- Subjekt a štýl musí opísať človek alebo agent – `send-message` berie iba text, takže skript si referenciu nedá opísať vision modelom.
+- `--no-palette` vynechá hex kódy z briefu; niektoré modely ich berú príliš doslovne.
+
+## Upscaling
+
+```bash
+"$IMG" upscale <obrázok> 2       # alebo 4; Lanczos + unsharp
+```
+
+Alebo `--upscale 2|4` pri generovaní – upscaluje každý vytvorený obrázok. Nie je to generatívny super-res, len resampling.
+
+## Interaktívne menu (iba pre človeka v termináli)
+
+`img.sh menu` bez `--non-interactive` je hub pre **človeka**: drží stav a vracia sa doň po každej zmene.
+
+**Agent ho nesmie spúšťať** – bez TTY skončí exitom **2**, aby agentovi nevisel bash call na stdin.
+
+Keď user chce interaktívne nastavenia, **neodpovedaj „nedá sa“**. Vypíš mu hotový príkaz na skopírovanie do jeho vlastného terminálu:
+
+```bash
+echo "$IMG menu"
+```
+
+Prvá otázka po štarte je, kam sa obrázky uložia:
 
 ```
   Where should the images be saved?
@@ -86,11 +130,10 @@ Tento skill je **bash-only**. Všetko beží cez OpenRouter MCP (`tools/call gen
   choice [1]:
 ```
 
-- Enter = **1**, teda aktuálny adresár.
-- `2` sa dopýta na cestu. Rozbalí `~`, adresár vytvorí (`mkdir -p`), overí zápis a uloží **absolútnu** cestu.
-- Neplatná cesta (existuje ako súbor, nedá sa vytvoriť, nie je zapisovateľná) vypíše chybu a otázka sa zopakuje. Nič sa nezaplatilo.
-- `q` tu skript ukončí.
-- **Ak si dal `-o <cesta>` na príkazovej riadke, otázka sa preskočí.**
+- Enter = **1**, aktuálny adresár. `2` sa dopýta na cestu (rozbalí `~`, vytvorí adresár, overí zápis, uloží absolútnu cestu). `q` ukončí.
+- Neplatná cesta vypíše chybu a otázka sa zopakuje. `-o <cesta>` na príkazovej riadke otázku preskočí.
+
+Potom nasleduje hub:
 
 ```
 1) Model            : black-forest-labs/flux.2-klein-4b   [auto: lowest catalogue price]
@@ -105,63 +148,49 @@ g) Generate         (2 paid call(s))
 q) Quit
 ```
 
-- **1 Model** – `a` auto (najnižšia katalógová cena), `l` výber zo zoznamu, `m` manuálny slug s validáciou cez `get-model` (zadarmo).
-- **2 References** – pridanie cesty, `magick` fakty sa zobrazia a ty dopíšeš subjekt/štýl. `p` prepína, či ide paleta (hex kódy) do briefu – niektoré modely ich berú príliš doslovne.
-- **3/4** – 6 pomerov × `1K/2K/4K`, hneď zobrazí výsledné pixely.
-- **5 Prompts** – pridať, editovať v `$EDITOR`, načítať zo súboru, zmazať.
-- **6** – upscale výstupov po generovaní (`off/2/4`).
-- **7** – upscale existujúceho obrázka alebo globu, **bez** generovania.
-- **8 Output dir** – ten istý picker ako pri štarte, plus `b` = ponechať súčasnú cestu. Rovnaká validácia.
-- **g** – potvrdenie pred platbou. Zablokuje sa, ak nie je model alebo prompt. Cenu **pred** callom neodhaduje (katalóg je nepoužiteľný), po calle vypíše skutočnú. Po dobehnutí vypíše ekvivalentný `gen`/`menu` príkaz na reprodukciu.
+- **1** `a` auto (najnižšia katalógová cena), `l` výber zo zoznamu, `m` manuálny slug s validáciou cez `get-model` (zadarmo).
+- **2** pridanie cesty, `magick` fakty sa zobrazia a user dopíše subjekt/štýl; `p` prepína paletu v briefe.
+- **3/4** 6 pomerov × `1K/2K/4K`, hneď zobrazí výsledné pixely.
+- **5** pridať prompt, editovať v `$EDITOR`, načítať zo súboru, zmazať.
+- **6** upscale výstupov po generovaní (`off/2/4`). **7** upscale existujúceho obrázka alebo globu **bez** generovania.
+- **8** ten istý picker ako pri štarte, plus `b` = ponechať súčasnú cestu.
+- **g** potvrdenie pred platbou; zablokuje sa bez modelu alebo promptu. Cenu pred callom neodhaduje (katalóg je nepoužiteľný), po calle vypíše skutočnú a ekvivalentný príkaz na reprodukciu.
 
-## Neinteraktívny režim (pre agenta)
+## Referencia
 
-```
-./img.sh menu --non-interactive -m <model> -r 16:9 -q 2K -o out \
-  --prompt "..." [--prompt "..."] \
-  [--ref path --ref-desc "opis"] [--no-palette] [--upscale 2|4] \
-  [--max-calls N] [--yes]
-```
+**Kontrakt výstupu**
+- **stdout** = iba cesty k vytvoreným súborom (jedna na riadok), takže `files=$("$IMG" gen ...)` funguje.
+- **stderr** = UI, diagnostika, chyby, otázky.
+- Výnimka: plán z `--non-interactive` bez `--yes` ide na stdout.
 
-- Bez `--yes` = **dry-run**: vypíše rozhodnutý plán vrátane finálnych promptov so vloženým ref briefom. Neplatí nič.
-- S `--yes` generuje. Pred callmi vypíše počet a model.
-- **Na výstupný adresár sa nikdy nepýta** – bez `-o` použije `./out`. Otázka o adresári je len v interaktívnom režime.
-- `--max-calls N` (default **4**) je poistka proti prepáleniu peňazí v smyčke. Viac promptov než limit = odmietnutie.
-- `--ref` a `--ref-desc` sa párujú **poradím**.
+**Výstupné súbory v `<outdir>`**
+- `NN-<model>.<ext>` – obrázok. **Prípona podľa magic bytes**, nie vždy PNG (flux vracia JPEG). Viac obrázkov z jednej odpovede: `NN-<model>-01.<ext>`, `-02`…
+- `NN-<model>.json` – sidecar: model, prompt, size, created, cost, tokens, status, files, upscaled, refs.
+- `raw/NN-<model>.raw.json` – odpoveď MCP, ukladá sa **pred** parsovaním, takže zaplatený obrázok sa nestratí. Po úspechu sa base64 vystrihne; pri chybe zostáva celá, aby sa obrázok dal zachrániť cez `"$IMG" extract <raw> <outdir> <base>`.
+- Raw je v podadresári, aby `<outdir>/*.json` matchovalo iba sidecary.
+- **Batch pokračuje po chybe**; `gen` vráti nenulový kód a vypíše súhrn.
 
-Exit kódy `menu`:
+**Obmedzenia MCP**
+- `generate-image` prijíma iba `model`, `prompt`, `size`. Žiadne `aspect_ratio`, `n`, `seed`, ani vstupné obrázky. Schému over cez `"$IMG" mcp tools/list`.
+- Každý prompt = samostatný platený call.
+
+**Exit kódy `menu`**
 
 | kód | význam |
 |-----|--------|
 | 0 | ok / dry-run |
-| 1 | chyba (napr. prekročené `--max-calls`, zlyhané generovanie) |
+| 1 | chyba (prekročené `--max-calls`, zlyhané generovanie) |
 | 2 | nie je TTY a nebolo dané `--non-interactive` |
-| 10 | `--ref` bez `--ref-desc`; zapísal `<outdir>/refs.pending.json`, **nič sa nezaplatilo** |
+| 10 | `--ref` bez `--ref-desc`; zapísal `refs.pending.json`, nič sa nezaplatilo |
 
-Pri exite 10: prečítaj obrázky Read toolom, doplň popisy a spusť znova s `--ref-desc` v rovnakom poradí.
+**Autentifikácia**
+- Token sa načíta z `~/.local/share/opencode/mcp-auth.json` (`openrouter.tokens.accessToken`), inak z `OPENROUTER_API_KEY`. Skript token nikdy nevypíše.
+- Token expiruje po ~7 dňoch. Pri hlásení o expirácii spusti v OpenCode ľubovoľný OpenRouter MCP tool a login sa obnoví.
 
-Bez TTY a bez `--non-interactive` skript **odmietne** bežať (exit 2), aby agentovi nevisel bash call na stdin.
+**Závislosti**: `curl`, `jq`, `base64`, `awk`, `file`, `magick` (ImageMagick).
 
-## Obmedzenia MCP
-- `generate-image` prijíma iba: `model`, `prompt`, `size`. Aspect ratio rieš explicitnou veľkosťou, referencie opisom v prompte.
-- Každý prompt = samostatný platený call.
-- Katalógová cena ≠ cena za obrázok (viď bod 2).
-
-## Rýchly workflow pre agenta
-1. `./img.sh mcp tools/list` (raz na session) – over schému.
-2. `./img.sh models | head` – vyber model.
-3. `./img.sh size 16:9 2K` – over výslednú veľkosť.
-4. Priprav prompt. Ak je referencia, prečítaj ju Read toolom a opíš do `--ref-desc`.
-5. `./img.sh menu --non-interactive -m <model> -r 16:9 -q 2K -o out --prompt "..."` – dry-run, skontroluj plán.
-6. To isté s `--yes` – generuj. Oznám userovi počet callov a model dopredu.
-7. (Voliteľné) `--upscale 2` alebo `./img.sh upscale out/01-<model>.jpg 2`.
-
-## Poznámka k autentifikácii
-- Token z `mcp-auth.json` exp. po ~7 dňoch. Ak skript zahlási expiráciu, v OpenCode spusti ľubovoľný OpenRouter MCP tool a obnoví sa login.
-
-## Testovací hook
-- `IMG_ASSUME_TTY=1` obíde TTY guard, aby sa interaktívna smyčka dala testovať skriptovaným stdin. Nepoužívaj na generovanie.
-- Pozor: prvý riadok skriptovaného stdin zhltne **otázka o výstupnom adresári**. Buď ju obsluž (`1` = cwd), alebo ju vynechaj cez `-o <cesta>`.
+**Testovací hook**: `IMG_ASSUME_TTY=1` obíde TTY guard pre testovanie interaktívnej smyčky skriptovaným stdin. Prvý riadok stdin zhltne otázka o výstupnom adresári (alebo ju vynechaj cez `-o`). Nepoužívaj na generovanie.
 
 ## Licencia
 MIT (pozri LICENSE.txt)
+</content>

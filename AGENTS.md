@@ -22,8 +22,8 @@ ai-skills/
 │   ├── SKILL.md           # Instructions for conducting research and generating reports
 │   └── LICENSE.txt
 ├── image-generation/       # Image generation skill with OpenRouter MCP
-│   ├── SKILL.md           # Comprehensive instructions (17 sections, bash workflow)
-│   ├── image-gen.sh       # Bash utility functions (6 functions, 110 lines)
+│   ├── SKILL.md           # Agent happy path first, then reference sections
+│   ├── img.sh             # Bash toolkit (menu/gen/models/size/extract/upscale/reffacts)
 │   └── LICENSE.txt        # MIT License
 └── README.md              # Brief overview (Slovak)
 ```
@@ -50,7 +50,7 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - **markdown-formatter:** Converts plain `.txt` files to rich Markdown (.md or .md+frontmatter). Detects content type (articles, lists, mixed) and applies appropriate formatting. No file modifications - outputs new file.
 - **deep-factcheck:** Fact-checks Hugo articles by extracting 7 key claims and verifying them via EXA Search MCP. Generates detailed report with sources and recommended corrections. No automatic commits.
 - **deep-research:** Conducts research on any topic via EXA Search MCP. Generates flexible output (.txt, .md, or .md+frontmatter). Supports filtering (academic, technical, news), translation to Slovak, and detailed metadata. No automatic commits.
-- **image-generation:** Generates images via OpenRouter MCP with batch support, upscaling (2x/4x), reference images (max 5), and dynamic model selection (ranking by price). Implemented in pure Bash with minimal 110-line utility script (image-gen.sh) and comprehensive SKILL.md documentation with real bash commands. Zero dependencies (native bash + jq + base64). Auto-discovery of models, saves PNG + JSON metadata. No automatic commits.
+- **image-generation:** Generates images via OpenRouter MCP (`tools/call generate-image`). Pure Bash: `img.sh` (~990 lines) with subcommands `menu`, `gen`, `models`, `size`, `extract`, `upscale`, `reffacts`, `mcp`. Deps: curl, jq, base64, awk, file, magick. Interactive `menu` is for humans (asks where to save first, then model/ratio/resolution/prompts/upscale); agents must use `menu --non-interactive --yes` and address the script by absolute path, since it is neither in the user's cwd nor on PATH. MCP accepts only `model`, `prompt`, `size` – no input images, so references become text in the prompt. Saves image + JSON sidecar + raw MCP response. No automatic commits.
 - **frontend-design:** No generated content; guidance only. Designed to be invoked as context, not output.
 
 ## Common Tasks

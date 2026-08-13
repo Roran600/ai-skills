@@ -9,6 +9,10 @@ set -euo pipefail
 #   everything else (UI, diagnostics, prompts) -> stderr
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+# Absolute path to this script. Every command the script suggests must be
+# runnable from any cwd: an agent's working directory is never SCRIPT_DIR,
+# so a relative "./img.sh" hint is a dead end.
+SELF="$SCRIPT_DIR/${0##*/}"
 DEFAULT_MCP_URL="https://mcp.openrouter.ai/mcp"
 DEFAULT_AUTH_PATH="${HOME}/.local/share/opencode/mcp-auth.json"
 
@@ -67,13 +71,17 @@ menu exit codes:
 Auth resolution (in order):
   1) $OPENROUTER_API_KEY
   2) $OPENCODE_MCP_AUTH (path) else ~/.local/share/opencode/mcp-auth.json
+EOF
+  # Second heredoc is unquoted so the examples carry the real absolute path.
+  # An agent's cwd is never this directory, so "./img.sh" would not run.
+  cat >&2 <<EOF
 
-Examples:
-  ./img.sh menu
-  ./img.sh size 16:9 2K
-  ./img.sh models | head
-  ./img.sh gen -m black-forest-labs/flux.2-pro -r 16:9 -q 2K -o out "sunset city"
-  ./img.sh menu --non-interactive -m qwen/qwen-image-3 --prompt "a cat" --dry-run
+Examples (copy-pasteable from any directory):
+  $SELF menu
+  $SELF size 16:9 2K
+  $SELF models | head
+  $SELF gen -m black-forest-labs/flux.2-pro -r 16:9 -q 2K -o . "sunset city"
+  $SELF menu --non-interactive --yes -m qwen/qwen-image-3 -o . --prompt "a cat"
 EOF
 }
 
@@ -403,6 +411,14 @@ cmd_gen() {
   (( ${#produced[@]} > 0 )) && printf '%s\n' "${produced[@]}"
 
   local ok=$(( ${#prompts[@]} - failed ))
+  # Unmistakable completion signal: without it the caller has to infer success
+  # from stdout, and a cautious one reports "a plan" instead of a result.
+  if (( ${#produced[@]} > 0 )); then
+    info "IMAGE(S) CREATED:"
+    printf '  %s\n' "${produced[@]}" >&2
+  else
+    err "NO IMAGE WAS CREATED."
+  fi
   info "Done: $ok ok, $failed failed. Actual cost reported by MCP: \$$total_cost"
   (( failed == 0 )) || return 1
 }
@@ -808,7 +824,7 @@ menu_summary() {
 }
 
 menu_equivalent_cmd() {
-  local out="./img.sh menu --non-interactive --yes -m ${M_MODEL:-MODEL} -r $M_RATIO -q $M_TIER -o $(printf '%q' "$M_OUTDIR")"
+  local out="$SELF menu --non-interactive --yes -m ${M_MODEL:-MODEL} -r $M_RATIO -q $M_TIER -o $(printf '%q' "$M_OUTDIR")"
   [[ -n "$M_UPSCALE" ]] && out="$out --upscale $M_UPSCALE"
   (( M_PALETTE )) || out="$out --no-palette"
   local i
@@ -844,7 +860,7 @@ menu_plan() {
   local size refs p i
   size=$(cmd_size "$M_RATIO" "$M_TIER" 2>/dev/null || echo "?")
   refs=$(refs_json)
-  echo "plan:"
+  echo "plan (nothing has been generated yet):"
   echo "  model      : ${M_MODEL:-<unset>}"
   echo "  ratio/tier : $M_RATIO / $M_TIER -> size=$size"
   echo "  outdir     : $M_OUTDIR"
@@ -856,7 +872,10 @@ menu_plan() {
     compose_prompt "${M_PROMPTS[$i]}" "$refs"
     echo
   done
-  echo "  equivalent : $(menu_equivalent_cmd)"
+  # A plan is not a deliverable. Spell out the one command that produces a file,
+  # otherwise this output gets mistaken for the finished job.
+  echo "NEXT STEP - required to actually create the image, run this exact command:"
+  echo "  $(menu_equivalent_cmd)"
 }
 
 write_pending_refs() {
@@ -915,7 +934,7 @@ cmd_menu() {
     [[ -n "$M_MODEL" ]] || die "--model is required in non-interactive mode"
     (( ${#M_PROMPTS[@]} > 0 )) || die "at least one --prompt is required in non-interactive mode"
     if (( M_DRYRUN || ! M_YES )); then
-      (( M_YES )) || info "dry-run: --yes not given, nothing will be spent"
+      (( M_YES )) || info "DRY-RUN ONLY - NO IMAGE WAS CREATED. NOTHING WAS SPENT."
       menu_plan
       return 0
     fi
@@ -924,7 +943,7 @@ cmd_menu() {
   fi
 
   if ! is_tty; then
-    err "no TTY: run './img.sh menu' in a terminal, or use --non-interactive (see --help)"
+    err "no TTY: run '$SELF menu' in a terminal, or use --non-interactive (see --help)"
     exit $EX_NO_TTY
   fi
 
