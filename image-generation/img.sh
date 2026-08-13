@@ -34,7 +34,7 @@ Usage: img.sh <command> [args]
 Commands:
   menu [opts]            Interactive picker (model, refs, ratio, resolution, upscale)
   mcp <tool|method> <json>  Call an MCP tool, or a bare JSON-RPC method (tools/list)
-  models                 List live image models (cheap -> expensive)
+  models [cat] [N]       List image models; cat = price|speed|quality (default: legacy price list)
   size <ratio> <tier>    Compute size string; ratio 1:1/16:9/9:16/4:3/3:4/21:9, tier 1K|2K|4K
   gen [opts] prompts..   Generate images (one paid MCP call per prompt)
   extract <file|-> [outdir] [base]  Decode base64 image(s) from a payload
@@ -161,7 +161,12 @@ mcp_call() {
 # Unwraps the catalogue, which arrives as a JSON string inside a text content block.
 # The API's pricing-low-to-high sorts by prompt price, which is $0/M for every image
 # model, so the order it returns is meaningless. Sort by parsed image price instead.
+#
+# No argument  -> the legacy 2-column "id<TAB>price" list (agents rely on this,
+#                 the output is deliberately kept byte-for-byte stable).
+# An argument  -> ranked, multi-column table via model_table (price|speed|quality).
 cmd_models() {
+  if [[ -n "${1:-}" ]]; then model_table "$@"; return; fi
   local payload='{"request":{"output_modalities":"image","limit":40,"sort":"pricing-low-to-high"}}'
   mcp_call list-models "$payload" \
     | jq -r '[ ((.result.content[]? | select(.type=="text") | .text | fromjson | .data[]?),
@@ -174,6 +179,85 @@ cmd_models() {
              | map(select(.id != null))
              | sort_by(.n)
              | .[] | [.id, .price] | @tsv' 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------- ranking
+
+# All three rankings come from the OpenRouter MCP, never REST/SDK. Each source
+# is a JSON array unwrapped from the text content block, cached once per session.
+CAT_RAW=""; THR_RAW=""; ARENA_RAW=""
+
+# mcp_data <tool> <payload> -> compact JSON array (the .data payload)
+mcp_data() {
+  mcp_call "$1" "$2" \
+    | jq -c '[.result.content[]? | select(.type=="text") | .text | fromjson | .data] | add // []' \
+      2>/dev/null || printf '[]'
+}
+
+cat_raw()   { [[ -n "$CAT_RAW" ]]   || CAT_RAW=$(mcp_data list-models     '{"request":{"output_modalities":"image","limit":100}}'); printf '%s' "$CAT_RAW"; }
+thr_raw()   { [[ -n "$THR_RAW" ]]   || THR_RAW=$(mcp_data list-models     '{"request":{"output_modalities":"image","limit":100,"sort":"throughput-high-to-low"}}'); printf '%s' "$THR_RAW"; }
+arena_raw() { [[ -n "$ARENA_RAW" ]] || ARENA_RAW=$(mcp_data list-benchmarks '{"request":{"source":"design-arena","category":"image"}}'); printf '%s' "$ARENA_RAW"; }
+
+# model_table <price|speed|quality> [N]  -> TSV, slug ALWAYS the first column
+#   columns: id  price_disp  elo  win%  speed
+# price   : cheapest image price first (data for ~43/45 models)
+# quality : highest design-arena elo first, measured models only (~10)
+# speed   : measured avg generation time first, then throughput proxy (~rN)
+# API latency sort is NOT used: it ranks a 201s model as 11th-fastest of 45
+# because it measures time-to-first-token, not image time.
+model_table() {
+  local cat=${1:-price} n=${2:-20}
+  case "$cat" in price|speed|quality) ;; *) die "category must be price|speed|quality";; esac
+  [[ "$n" =~ ^[0-9]+$ ]] || die "N must be a number"
+  local catd thrd arend
+  catd=$(cat_raw); thrd=$(thr_raw)
+  if [[ -z "$catd" || "$catd" == "[]" ]]; then
+    err "NO MODEL DATA from MCP - use the default model black-forest-labs/flux.2-klein-4b"
+    return 1
+  fi
+  arend='[]'
+  if [[ "$cat" != "price" ]]; then
+    arend=$(arena_raw)
+    if [[ -z "$arend" || "$arend" == "[]" ]]; then
+      err "NO RANKING DATA from MCP - use the default model black-forest-labs/flux.2-klein-4b"
+      return 1
+    fi
+  fi
+  jq -rn --argjson cat "$catd" --argjson thr "$thrd" --argjson arena "$arend" \
+         --arg cat_key "$cat" --argjson n "$n" '
+    ( [ $thr[] | .canonical_slug ] | to_entries
+      | map({key:.value, value:(.key+1)}) | from_entries ) as $thrrank
+    | ( $arena | group_by(.model_permaslug)
+        | map({ key: .[0].model_permaslug,
+                value: { elo: (map(.elo)|max),
+                         win: (map(.win_rate)|max),
+                         ms:  (map(.avg_generation_time_ms)|min) } })
+        | from_entries ) as $ar
+    | [ $cat[]
+        | . as $m
+        | ($m.pricing.image_output // $m.pricing.image_token // $m.pricing.prompt // "") as $pr
+        | ($pr | tostring | gsub("[^0-9.]";"")
+           | if . == "" or . == "." then null else (tonumber? // null) end) as $pnum
+        | ($ar[$m.canonical_slug]) as $a
+        | { id: $m.id,
+            pnum: ($pnum // 1e18),
+            pdisp: (if $pr == "" then "-" else ($pr|tostring) end),
+            elo: ($a.elo), win: ($a.win), ms: ($a.ms),
+            thr: ($thrrank[$m.canonical_slug] // 999) } ]
+    | ( if   $cat_key == "price"   then [ .[] | select(.pnum < 1e18) ] | sort_by(.pnum)
+        elif $cat_key == "quality" then [ .[] | select(.elo != null) ] | sort_by(-.elo)
+        elif $cat_key == "speed"   then
+             ( [ .[] | select(.ms != null) ] | sort_by(.ms) )
+           + ( [ .[] | select(.ms == null) ] | sort_by(.thr) )
+        else . end )
+    | .[0:$n] | .[]
+    | [ .id, .pdisp,
+        (if .elo == null then "-" else (.elo|floor|tostring) end),
+        (if .win == null then "-" else ((.win|floor|tostring) + "%") end),
+        (if .ms != null then ((.ms/1000|floor|tostring) + "s")
+         elif .thr != 999 then ("~r" + (.thr|tostring))
+         else "-" end) ]
+    | @tsv'
 }
 
 # ---------------------------------------------------------------- size
@@ -576,51 +660,83 @@ compose_prompt() { # compose_prompt <prompt> <refs_json>
 
 # ---------------------------------------------------------------- menu screens
 
+# Validate a user-typed slug for free via get-model. Shared by the router and
+# the "manual" option inside the ranked browser.
+menu_manual_slug() {
+  local slug; ask slug "  slug: " "$M_MODEL"
+  [[ -n "$slug" ]] || return
+  local author rest resp
+  author=${slug%%/*}; rest=${slug#*/}
+  if [[ "$author" == "$slug" ]]; then err "slug must look like author/model"; return; fi
+  resp=$(mcp_call get-model "$(jq -nc --arg a "$author" --arg s "$rest" '{request:{author:$a,slug:$s}}')" 2>/dev/null || true)
+  if [[ -n "$(printf '%s' "$resp" | payload_error_text)" ]]; then
+    err "model not found: $slug"
+  else
+    M_MODEL=$slug; M_MODEL_SRC="manual (validated)"
+  fi
+}
+
+# Paged ranked list for one category, 5 rows per page, global 1-N numbering.
+menu_browse_models() { # <price|speed|quality>
+  local cat=$1 tsv per=5 page=0 total pages i start end
+  local -a ids=() lines=()
+  tsv=$(model_table "$cat" 20 2>/dev/null) || { err "no ranking data for $cat; pick auto or manual"; return; }
+  local id pd elo win sp q
+  while IFS=$'\t' read -r id pd elo win sp; do
+    [[ -n "$id" ]] || continue
+    if [[ "$elo" != "-" ]]; then q="$elo/$win"; else q="-"; fi
+    ids+=("$id")
+    lines+=("$(printf '%-40s %-15s %-10s %s' "$id" "$pd" "$q" "$sp")")
+  done <<<"$tsv"
+  total=${#ids[@]}
+  (( total > 0 )) || { err "catalogue empty"; return; }
+  pages=$(( (total + per - 1) / per ))
+  while true; do
+    ui ""
+    ui "  Model by $cat - page $((page+1))/$pages   ($total models)"
+    printf "      %-40s %-15s %-10s %s\n" "model" "price" "quality" "speed" >&2
+    start=$((page*per)); end=$((start+per)); (( end > total )) && end=$total
+    for (( i=start; i<end; i++ )); do
+      printf "  %2d) %s\n" "$((i+1))" "${lines[$i]}" >&2
+    done
+    ui "  n) next   p) prev   m) manual slug   b) back"
+    ui "  (price is per-token, NOT per-image; speed ~rN = throughput proxy - see SKILL.md)"
+    local c; ask c "  number 1-$total (or n/p/m/b): " ""
+    case "$c" in
+      n|N) if (( page < pages-1 )); then page=$((page+1)); else err "last page"; fi;;
+      p|P) if (( page > 0 )); then page=$((page-1)); else err "first page"; fi;;
+      m|M) menu_manual_slug; [[ -n "$M_MODEL" ]] && return;;
+      b|B|"") return;;
+      *) if [[ "$c" =~ ^[0-9]+$ ]] && (( c >= 1 && c <= total )); then
+           M_MODEL=${ids[$((c-1))]}; M_MODEL_SRC="$cat rank $c"; return
+         else err "enter a number 1-$total, or n/p/m/b"; fi;;
+    esac
+  done
+}
+
 menu_pick_model() {
   ui ""
-  ui "  a) auto  - cheapest from the live catalogue"
-  ui "  l) list  - pick from the live catalogue"
-  ui "  m) manual - type a slug"
+  ui "  Choose model by:"
+  ui "    1) price    - cheapest first"
+  ui "    2) speed    - fastest first (10 measured, rest ~throughput proxy)"
+  ui "    3) quality  - highest design-arena elo first (measured only)"
+  ui "    a) auto     - cheapest in the catalogue"
+  ui "    m) manual   - type a slug"
+  ui "    b) back"
   local c; ask c "  choice [a]: " "a"
   case "${c:-a}" in
+    1) menu_browse_models price;;
+    2) menu_browse_models speed;;
+    3) menu_browse_models quality;;
     a|A)
       local first
       first=$(models_cache | awk 'NR==1{print $1}')
       [[ -n "$first" ]] || { err "catalogue empty"; return; }
       M_MODEL=$first; M_MODEL_SRC="auto: lowest catalogue price"
       ;;
-    l|L)
-      local -a ids=() prices=()
-      while IFS=$'\t' read -r id price; do
-        [[ -n "$id" ]] && { ids+=("$id"); prices+=("$price"); }
-      done <<<"$(models_cache)"
-      (( ${#ids[@]} > 0 )) || { err "catalogue empty"; return; }
-      local i
-      ui ""
-      for (( i=0; i<${#ids[@]}; i++ )); do
-        printf "  %2d) %-42s %s\n" "$((i+1))" "${ids[$i]}" "${prices[$i]}" >&2
-      done
-      ui "  (catalogue price is per-token, NOT per-image - see SKILL.md)"
-      local n; ask n "  number: " ""
-      if [[ "$n" =~ ^[0-9]+$ ]] && (( n >= 1 && n <= ${#ids[@]} )); then
-        M_MODEL=${ids[$((n-1))]}; M_MODEL_SRC="picked from list"
-      else
-        err "invalid selection"
-      fi
-      ;;
-    m|M)
-      local slug; ask slug "  slug: " "$M_MODEL"
-      [[ -n "$slug" ]] || return
-      local author rest resp
-      author=${slug%%/*}; rest=${slug#*/}
-      if [[ "$author" == "$slug" ]]; then err "slug must look like author/model"; return; fi
-      resp=$(mcp_call get-model "$(jq -nc --arg a "$author" --arg s "$rest" '{request:{author:$a,slug:$s}}')" 2>/dev/null || true)
-      if [[ -n "$(printf '%s' "$resp" | payload_error_text)" ]]; then
-        err "model not found: $slug"
-      else
-        M_MODEL=$slug; M_MODEL_SRC="manual (validated)"
-      fi
-      ;;
+    m|M) menu_manual_slug;;
+    b|B|"") return;;
+    *) err "unknown choice: $c";;
   esac
 }
 

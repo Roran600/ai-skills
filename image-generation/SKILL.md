@@ -65,10 +65,27 @@ Potom oznám userovi počet platených callov a model, a spusti ten istý príka
 
 ## Výber modelu
 
-- Default: `black-forest-labs/flux.2-klein-4b`.
-- Živý katalóg: `"$IMG" models | head -5` (najlacnejšie prvé, `output_modalities=image`).
-- Slug od usera over zadarmo: `"$IMG" mcp get-model '{"request":{"author":"<author>","slug":"<slug>"}}'`.
-- **Cena v katalógu nie je cena za obrázok.** Je to `image_output` za token. Reálny call na `flux.2-klein-4b` stál `$0.015`, katalóg uvádza `$0.0000034`. Userovi nikdy neuvádzaj katalógovú hodnotu ako cenu za obrázok – použi skutočnú cenu z výstupu `gen`.
+**Model neriešiš, ak to user výslovne nechce** – default `black-forest-labs/flux.2-klein-4b` je funkčný a lacný. Kategórie nižšie použi **iba** keď user povie „najlacnejší / najrýchlejší / najlepší / najkvalitnejší“.
+
+Radenie beží cez OpenRouter MCP (žiadne REST/SDK). Slug je **vždy prvý stĺpec**, takže ber prvý stĺpec, nikdy nevkladaj celý riadok do `-m`:
+
+```bash
+"$IMG" models price   1 | cut -f1     # najlacnejší
+"$IMG" models speed   1 | cut -f1     # najrýchlejší
+"$IMG" models quality 1 | cut -f1     # najkvalitnejší (najvyššie design-arena elo)
+```
+
+Celý rebríček (TSV `slug  cena  elo  win%  rýchlosť`): `"$IMG" models <price|speed|quality> [N]` (N default 20).
+
+- **price** – najlacnejšie prvé (dáta pre ~43/45 modelov).
+- **speed** – 10 modelov s reálne meraným časom generovania, zvyšok proxy podľa throughputu, značený `~rN`. API `latency` sort sa **nepoužíva** – model s reálnymi 201 s v ňom vyjde ako 11. najrýchlejší z 45 (meria time-to-first-token, nie čas obrázka).
+- **quality** – iba modely s meraným design-arena elo (~10).
+- Ak `models` vypíše `NO RANKING DATA from MCP`, použi default model a pokračuj v generovaní – **nevypisuj namiesto toho vysvetlenie**.
+
+Slug od usera over zadarmo: `"$IMG" mcp get-model '{"request":{"author":"<author>","slug":"<slug>"}}'`.
+
+**Cena v katalógu nie je cena za obrázok.** Je to `image_output` za token. Reálny call na `flux.2-klein-4b` stál `$0.015`, katalóg uvádza `$0.0000034`. Userovi nikdy neuvádzaj katalógovú hodnotu ako cenu za obrázok – použi skutočnú cenu z výstupu `gen`.
+
 
 ## Pomer a veľkosť
 
@@ -148,7 +165,7 @@ g) Generate         (2 paid call(s))
 q) Quit
 ```
 
-- **1** `a` auto (najnižšia katalógová cena), `l` výber zo zoznamu, `m` manuálny slug s validáciou cez `get-model` (zadarmo).
+- **1** rozcestník `1) price  2) speed  3) quality  a) auto  m) manual  b) back`. Kategórie otvoria stránkovaný rebríček (5 na stranu, globálne číslovanie 1–20, `n`/`p` listovanie, `m` manuál, `b` späť) s cenou, elo/win % a rýchlosťou pri každom modeli. `a` auto = najlacnejší z katalógu, `m` manuálny slug s validáciou cez `get-model` (zadarmo).
 - **2** pridanie cesty, `magick` fakty sa zobrazia a user dopíše subjekt/štýl; `p` prepína paletu v briefe.
 - **3/4** 6 pomerov × `1K/2K/4K`, hneď zobrazí výsledné pixely.
 - **5** pridať prompt, editovať v `$EDITOR`, načítať zo súboru, zmazať.
