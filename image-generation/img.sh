@@ -48,6 +48,7 @@ gen options:
 
 menu options (non-interactive contract for agents):
   --non-interactive    Required when there is no TTY
+  --questions          Print the questionnaire to ask the user, then exit (no TTY needed)
   --yes                Actually spend money (without it: dry-run)
   --dry-run            Print the resolved plan and exit
   --max-calls N        Circuit breaker, default 4
@@ -615,6 +616,7 @@ M_MAXCALLS=4
 M_NONINTERACTIVE=0
 M_YES=0
 M_DRYRUN=0
+M_QUESTIONS=0
 declare -a M_PROMPTS=()
 declare -a M_REF_PATHS=()
 declare -a M_REF_DESCS=()
@@ -1006,10 +1008,27 @@ write_pending_refs() {
   printf '%s\n' "$f"
 }
 
+# A fixed questionnaire an agent relays to the user when they ask for the menu
+# but there is no TTY. Deterministic on purpose: same text for every model, so
+# a weak one has nothing to improvise. Prints to stdout, needs no TTY.
+menu_questions() {
+  cat <<EOF
+Ask the user these, then generate. Values in [] are defaults - keep them if the user does not care.
+  1) Prompt      : (required) what to draw, in English, be specific
+  2) Aspect ratio: [16:9]  one of 1:1 16:9 9:16 4:3 3:4 21:9
+  3) Resolution  : [2K]    one of 1K 2K 4K
+  4) Output dir  : [current directory]  any path
+  5) Model       : [black-forest-labs/flux.2-klein-4b]  only if the user wants another
+Then run (one --prompt per image):
+  $SELF menu --non-interactive --yes -m <model> -r <ratio> -q <tier> -o <dir> --prompt "<prompt>"
+EOF
+}
+
 cmd_menu() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --non-interactive) M_NONINTERACTIVE=1; shift;;
+      --questions) M_QUESTIONS=1; shift;;
       --yes|-y) M_YES=1; shift;;
       --dry-run) M_DRYRUN=1; shift;;
       --max-calls) M_MAXCALLS=${2:-4}; shift 2;;
@@ -1029,6 +1048,9 @@ cmd_menu() {
 
   [[ "$M_MAXCALLS" =~ ^[0-9]+$ ]] || die "--max-calls must be a number"
   [[ -z "$M_UPSCALE" || "$M_UPSCALE" == "2" || "$M_UPSCALE" == "4" ]] || die "--upscale must be 2 or 4"
+
+  # The questionnaire works with or without a TTY and never spends anything.
+  if (( M_QUESTIONS )); then menu_questions; return 0; fi
 
   if (( M_NONINTERACTIVE )); then
     local i
@@ -1059,7 +1081,10 @@ cmd_menu() {
   fi
 
   if ! is_tty; then
-    err "no TTY: run '$SELF menu' in a terminal, or use --non-interactive (see --help)"
+    err "'menu' is interactive and needs a TTY (exit $EX_NO_TTY)."
+    err "AGENT: do not hand this back to the user. Run '$SELF menu --questions',"
+    err "  ask the user those questions, then run 'menu --non-interactive --yes ...'."
+    err "HUMAN: for the full interactive picker, run '$SELF menu' in your own terminal."
     exit $EX_NO_TTY
   fi
 
@@ -1082,6 +1107,11 @@ cmd_menu() {
       g|G)
         if [[ -z "$M_MODEL" ]]; then err "pick a model first (option 1)"; continue; fi
         if (( ${#M_PROMPTS[@]} == 0 )); then err "add at least one prompt first (option 5)"; continue; fi
+        # IMG_ASSUME_TTY is a test hook, not a way to spend money from a fake TTY.
+        if [[ -n "${IMG_ASSUME_TTY:-}" ]]; then
+          err "IMG_ASSUME_TTY is set: refusing to spend. Use 'menu --non-interactive --yes' to generate."
+          continue
+        fi
         local size; size=$(cmd_size "$M_RATIO" "$M_TIER" 2>/dev/null || echo "?")
         ui ""
         ui "  About to spend: ${#M_PROMPTS[@]} paid call(s)"

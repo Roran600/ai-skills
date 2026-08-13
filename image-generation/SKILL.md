@@ -15,9 +15,20 @@ metadata:
 
 Pravidlá, ktoré platia nad všetkým ostatným v tomto súbore:
 
-- **Toto nie je text na prerozprávanie.** Príkazy nižšie spusti Bash toolom.
+- **Toto nie je text na prerozprávanie ani na odkývanie.** Nevypisuj tieto pravidlá – konaj. Príkazy nižšie spusti Bash toolom.
 - **Hotovo je až vtedy, keď na disku existuje súbor s obrázkom.** Nie keď vieš, ako by sa vygeneroval.
 - **Nikdy neodovzdaj výstup `plan (nothing has been generated yet):` ako výsledok.** To je dry-run, obrázok pri ňom nevznikne.
+- **Nikdy nevráť prácu userovi so slovami „spusti to v termináli“.** Ak `menu` zlyhá na TTY, postupuj podľa playbooku nižšie.
+
+### Keď user povie „spusti menu“ / chce nastavenia
+
+`menu` bez `--non-interactive` **nespúšťaj** – bez TTY vždy spadne (exit 2). Namiesto toho:
+
+1. `"$IMG" menu --questions` – vypíše fixný zoznam otázok s defaultmi (nič nestojí, nepotrebuje TTY).
+2. Polož userovi tie otázky v **jednej** správe. Na čo už odpoveď máš, sa nepýtaj.
+3. Po odpovedi generuj rovno krokom 2 nižšie (`--non-interactive --yes`).
+
+Plné interaktívne TUI vie spustiť len user vo vlastnom termináli (`"$IMG" menu`) – ponúkni to nanajvýš ako druhú možnosť, nie ako svoju odpoveď.
 
 ### 1. Nájdi skript (raz na session)
 
@@ -129,12 +140,12 @@ Alebo `--upscale 2|4` pri generovaní – upscaluje každý vytvorený obrázok.
 
 `img.sh menu` bez `--non-interactive` je hub pre **človeka**: drží stav a vracia sa doň po každej zmene.
 
-**Agent ho nesmie spúšťať** – bez TTY skončí exitom **2**, aby agentovi nevisel bash call na stdin.
+**Agent ho nesmie spúšťať** – bez TTY skončí exitom **2**. Keď user chce nastavenia, agent postupuje podľa playbooku „Keď user povie »spusti menu«“ vyššie (`menu --questions` → otázky → generovanie), **nie** odovzdaním príkazu späť.
 
-Keď user chce interaktívne nastavenia, **neodpovedaj „nedá sa“**. Vypíš mu hotový príkaz na skopírovanie do jeho vlastného terminálu:
+Pre **človeka**: plný picker spustíš vo vlastnom termináli:
 
 ```bash
-echo "$IMG menu"
+"$IMG" menu
 ```
 
 Prvá otázka po štarte je, kam sa obrázky uložia:
@@ -206,7 +217,7 @@ q) Quit
 
 **Závislosti**: `curl`, `jq`, `base64`, `awk`, `file`, `magick` (ImageMagick).
 
-**Testovací hook**: `IMG_ASSUME_TTY=1` obíde TTY guard pre testovanie interaktívnej smyčky skriptovaným stdin. Prvý riadok stdin zhltne otázka o výstupnom adresári (alebo ju vynechaj cez `-o`). Nepoužívaj na generovanie.
+**Testovací hook**: `IMG_ASSUME_TTY=1` obíde TTY guard pre testovanie interaktívnej smyčky skriptovaným stdin. Prvý riadok stdin zhltne otázka o výstupnom adresári (alebo ju vynechaj cez `-o`). Voľba `g` (platené generovanie) je pri tomto hooku **zablokovaná**, takže z podvrhnutého TTY sa nedá minúť; na reálne generovanie použi `menu --non-interactive --yes`.
 
 ## Licencia
 MIT (pozri LICENSE.txt)
