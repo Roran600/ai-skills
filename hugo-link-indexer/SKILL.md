@@ -20,19 +20,61 @@ Si asistent na priebežné udržiavanie zoznamu odkazov v Hugo Markdown súbore.
 - Pred zápisom vždy zobraz plánované zmeny a vyžiadaj si výslovné potvrdenie.
 - Ak používateľ zápis nepotvrdí, nič nemen a zachovaj iba výsledky aktuálneho overenia v chate.
 
-## OCHRANA HUGO FRONT MATTER
+## HUGO FRONT MATTER
 
-Front matter iba skontroluj. Nikdy ho neprepisuj, neupravuj, neformátuj, nedopĺňaj ani nepresúvaj.
+Pre tento zoznam odkazov je povinný nasledujúci YAML front matter a úvodný obsah:
+
+```markdown
+---
+title: Odkazy
+# linkTitle:
+date:
+draft: false
+description: Odkazy na zaujímavé veci a projekty.
+noindex: false
+comments: false
+nav_weight: 1000
+nav_icon:
+   vendor: bs
+   name: link
+   # color: '#e24d0e'
+series:
+  - Docs
+categories:
+#  -
+tags:
+#  -
+images:
+#  -
+# menu:
+#   main:
+#     weight: 100
+#     params:
+#       icon:
+#         vendor: simple-icons
+#         name: docker
+#         color: '#e24d0e'
+---
+
+Odkazy na zaujímavé veci a projekty.
+<!--more-->
+```
+
+Front matter existujúceho súboru nikdy automaticky neprepisuj, neupravuj,
+neformátuj, nedopĺňaj ani nepresúvaj.
 
 Pri načítaní súboru:
 
 1. Over, že súbor existuje a má príponu `.md` alebo inú používateľom výslovne zvolenú Markdown príponu.
-2. Zisti, či sa na začiatku súboru nachádza front matter ohraničený `---` alebo TOML front matter ohraničený `+++`.
-3. Ak front matter chýba alebo je nejednoznačný, informuj používateľa. Neopravuj ho automaticky.
-4. Obsah front matter považuj za nemenný blok. Všetky zápisy rob iba za jeho uzatváracím oddeľovačom.
-5. Ak súbor obsahuje iba front matter, môžeš zaň pridať obsah až po potvrdení používateľa.
+2. Ak je súbor úplne prázdny, priprav jeho vytvorenie podľa presného vzoru vyššie.
+3. Ak sa na začiatku súboru nachádza front matter ohraničený `---`, porovnaj ho s povinným vzorom vrátane hodnôt, komentárov a štruktúry.
+4. TOML front matter ohraničený `+++`, chýbajúci front matter alebo nejednoznačný začiatok označ ako nevyhovujúci.
+5. Ak existujúci front matter nie je zhodný so vzorom, iba upozorni používateľa. Zobraz konkrétne rozdiely medzi očakávaným a aktuálnym stavom a nič automaticky neopravuj.
+6. Do súboru s nevyhovujúcim front matter nepridávaj odkazy, kým používateľ nepotvrdí ďalší postup.
+7. Pri vyhovujúcom front matter považuj celý blok za nemenný. Všetky zápisy rob iba za jeho uzatváracím oddeľovačom.
+8. Ak súbor obsahuje iba vyhovujúci front matter, môžeš zaň pridať úvodný text a odkazy až po potvrdení používateľa.
 
-Pri príprave zápisu musí byť výsledok front matter byte-for-byte rovnaký ako načítaný obsah. Neaktualizuj `date`, `description`, `tags`, `categories`, `nav_weight` ani žiadny iný front matter field.
+Pri príprave zápisu musí byť vyhovujúci existujúci front matter byte-for-byte rovnaký ako načítaný obsah. Neaktualizuj `date`, `description`, `tags`, `categories`, `nav_weight` ani žiadny iný front matter field.
 
 ## INTERAKTÍVNY WORKFLOW
 
@@ -54,7 +96,9 @@ Pri ceste:
 - preferuj súbory v Hugo projekte, najmä pod `content/`,
 - odmietni cestu, ktorá smeruje na adresár alebo neexistujúci súbor,
 - načítaj celý súbor pred prijatím prvého URL,
-- zobraz, či front matter existuje; jeho hodnoty nevypisuj celé, ak to nie je potrebné.
+- pri prázdnom súbore zobraz návrh vygenerovaného front matter,
+- pri odlišnom front matter zobraz používateľovi konkrétny diff oproti povinnému vzoru,
+- pri vyhovujúcom front matter zobraz, že kontrola prešla; jeho hodnoty nevypisuj celé, ak to nie je potrebné.
 
 Ak súbor obsahuje necommitnuté používateľské zmeny, nesnaž sa ich opravovať ani prepisovať. Upozorni na ne a pokračuj iba po súhlase používateľa.
 
@@ -67,11 +111,13 @@ Vyzvi používateľa, aby posielal odkazy zaradom, po jednom alebo po viacerých
 
 Pre každý vstup:
 
-1. Extrahuj iba platné HTTP(S) URL.
-2. Zjavný text, komentár alebo názov odkazu zachovaj ako pomocný kontext, ale nenahrádzaj ním výsledok EXA.
-3. Neplatný alebo neúplný odkaz označ ako odmietnutý a vyžiadaj si opravu.
-4. URL normalizuj iba na účely porovnávania duplicít: ignoruj koncové `/`, fragment `#...` a rozdiel v case hostname. Do súboru zapisuj pôvodnú URL používateľa, ak nie je zjavne chybná.
-5. Duplicitu kontroluj proti existujúcim tabuľkám aj proti odkazom prijatým v aktuálnej relácii.
+1. Extrahuj platné HTTP(S) URL aj holé domény bez schémy, napríklad `bla.com` alebo `www.bla.com`.
+2. Pri holej doméne automaticky over varianty `https://` a `http://` v tomto poradí. Preferuj funkčný HTTPS variant; HTTP použi iba ako fallback.
+3. Ak schému nie je možné spoľahlivo určiť, označ vstup ako odmietnutý a vyžiadaj si úplnú URL.
+4. Zjavný text, komentár alebo názov odkazu zachovaj ako pomocný kontext, ale nenahrádzaj ním výsledok EXA.
+5. Neplatný alebo neúplný odkaz označ ako odmietnutý a vyžiadaj si opravu.
+6. URL normalizuj iba na účely porovnávania duplicít: ignoruj koncové `/`, fragment `#...` a rozdiel v case hostname. Do súboru zapisuj overenú URL s doplnenou schémou.
+7. Duplicitu kontroluj proti existujúcim tabuľkám aj proti odkazom prijatým v aktuálnej relácii, a to aj pri rozdiele iba v schéme.
 
 Po každom odkaze môžeš pokračovať ďalším bez zápisu do súboru. Súbor neupravuj priebežne.
 
@@ -130,15 +176,22 @@ Existujúci záznam nikdy automaticky nemen.
 
 ## FORMÁT ZÁPISU
 
-Preferovaný formát je samostatný nadpis kategórie s tabuľkou `Stránka | Popis`:
+Preferovaný formát je samostatný nadpis kategórie s tabuľkou `Stránka | Popis`. Každá URL musí byť klikateľný Markdown odkaz:
 
 ```markdown
 ## Softvér
 
 | Stránka | Popis |
 | --- | --- |
-| https://bla.com/ | Repozitár so starším abandonware softvérom. |
+| [bla.com](https://bla.com/) | Repozitár so starším abandonware softvérom. |
 ```
+
+Pravidlá pre odkaz v prvom stĺpci:
+
+- používaj syntax `[text odkazu](overená URL)`, nikdy nevkladaj URL ako neklikateľný holý text,
+- pri URL bez cesty použi ako text odkazu hostname bez `http://`, `https://` a koncového `/`,
+- pri URL s cestou preferuj názov domény; cestu zachovaj v href,
+- URL v href musí obsahovať automaticky zistenú alebo používateľom zadanú schému.
 
 Pri existujúcej kategórii:
 
@@ -186,7 +239,7 @@ Na zápis:
 Navrhované nové riadky:
 | Kategória | Stránka | Popis |
 | --- | --- | --- |
-| Softvér | https://bla.com/ | ... |
+| Softvér | [bla.com](https://bla.com/) | ... |
 ```
 
 Vyžiadaj si potvrdenie presne pre navrhované nové riadky. Zmeny existujúcich záznamov zobraz v samostatnom zozname a vyžiadaj si ich potvrdenie zvlášť.
@@ -204,6 +257,8 @@ Po zápise načítaj súbor a over:
 - front matter existuje a je nezmenený,
 - každý nový odkaz je v správnej kategórii,
 - každý riadok má presne dve tabuľkové hodnoty,
+- každý nový odkaz používa klikateľnú Markdown syntax `[text](URL)`,
+- každý href obsahuje správne určenú `http://` alebo `https://` schému,
 - nebol pridaný duplicitný odkaz,
 - Markdown tabuľka je syntakticky čitateľná,
 - nadpisy, prázdne riadky a tabuľky sú vizuálne konzistentné,
