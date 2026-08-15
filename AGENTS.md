@@ -12,6 +12,9 @@ ai-skills/
 ├── hugo-search/            # Hugo Wiki research assistant skill  
 │   ├── SKILL.md           # Instructions for writing Hugo wiki content in Slovak
 │   └── LICENSE.txt
+├── hugo-link-indexer/      # URL verification and Hugo Markdown link indexer
+│   ├── SKILL.md           # Instructions for categorized link tables with EXA
+│   └── LICENSE.txt
 ├── markdown-formatter/     # TXT to Markdown converter skill
 │   ├── SKILL.md           # Instructions for formatting .txt files to rich markdown
 │   └── LICENSE.txt
@@ -37,6 +40,7 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - `markdown-formatter`: Slovenčina. Flexibilné formátovanie .txt súborov do bogatého markdownu.
 - `deep-factcheck`: Slovenčina. Fact-checking Hugo článkov s prioritizáciou 7 tvrdení.
 - `deep-research`: Slovenčina. Výskumný asistent s flexibilným výstupom a deduplikáciou.
+- `hugo-link-indexer`: Slovenčina. Overovanie URL cez EXA a bezpečné dopĺňanie kategorizovaných Markdown tabuliek bez zmeny front matter.
 - `image-generation`: Slovenčina. Generovanie obrázkov cez OpenRouter MCP s batch, upscaling, reference images.
 - `frontend-design`: English. Emphasizes distinctive, opinionated design choices grounded in the subject matter.
 
@@ -50,6 +54,7 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - **markdown-formatter:** Converts plain `.txt` files to rich Markdown (.md or .md+frontmatter). Detects content type (articles, lists, mixed) and applies appropriate formatting. No file modifications - outputs new file.
 - **deep-factcheck:** Fact-checks Hugo articles by extracting 7 key claims and verifying them via EXA Search MCP. Generates detailed report with sources and recommended corrections. No automatic commits.
 - **deep-research:** Conducts research on any topic via EXA Search MCP. Generates flexible output (.txt, .md, or .md+frontmatter). Supports filtering (academic, technical, news), translation to Slovak, and detailed metadata. No automatic commits.
+- **hugo-link-indexer:** Verifies user-provided URLs via EXA, classifies them into category headings, and appends entries to Markdown tables only after confirmation. Never rewrites Hugo front matter or existing records without confirmation.
 - **image-generation:** Generates images via OpenRouter MCP (`tools/call generate-image`). Pure Bash: `img.sh` (~1150 lines) with subcommands `menu`, `gen`, `models`, `size`, `extract`, `upscale`, `reffacts`, `mcp`. Model ranking pulls three MCP sources (`list-models` for price, `list-models sort=throughput` as a speed proxy, `list-benchmarks source=design-arena` for measured elo/win-rate/generation-time); `models <price|speed|quality> [N]` and the interactive menu router expose them. Deps: curl, jq, base64, awk, file, magick. Interactive `menu` is for humans (asks where to save first, then model/ratio/resolution/prompts/upscale); agents must use `menu --non-interactive --yes` and address the script by absolute path, since it is neither in the user's cwd nor on PATH. When a user asks for the menu without a TTY, agents run `menu --questions` (a fixed questionnaire) and then generate non-interactively rather than handing the command back. MCP accepts only `model`, `prompt`, `size` – no input images, so references become text in the prompt. Saves image + JSON sidecar + raw MCP response. No automatic commits.
 - **frontend-design:** No generated content; guidance only. Designed to be invoked as context, not output.
 
