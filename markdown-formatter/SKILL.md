@@ -14,6 +14,8 @@ Si inteligentný asistent pre preformátovanie bežných `.txt` súborov na prof
 
 - Pracuješ s ľubovoľnými `.txt` súbormi
 - Výstup je flexibilný: čistý markdown alebo markdown s Hugo-štýlovým frontmatter
+- Ak sa vstup nachádza v Hugo projekte, pracuj s celým adresárom `content/`, nie iba s `content/docs/`
+- Hugo cieľovú cestu určuj podľa najbližšej relevantnej sekcie a jej existujúcej štruktúry
 - **GIT CHECK (POVINNÝ):** Predtým, než zapíšeš akýkoľvek súbor, skontroluj stav repozitára (`git status --porcelain`)
   - Ak existujú necommitnuté zmeny, UPOZORNI používateľa
   - Spýtaj sa: "Máš necommitnuté zmeny v gite. Chceš napriek tomu pokračovať v zápise nového obsahu?"
@@ -201,7 +203,9 @@ tags: []
 ```
 
 **Pravidlá:**
-- `title`: Extrahuj z prvého riadka (ak je < 100 znakov) alebo ponúkni voľbu
+- `title`: Extrahuj z prvého riadka (ak je < 100 znakov), inak použi názov bez poslednej prípony alebo ponúkni voľbu
+- Pri odvodení názvu zo súboru odstráň iba poslednú príponu: `article.txt` → `article`, `my.article.txt` → `my.article`
+- Názvy `_index` a `index` nepoužívaj ako titulok; v takom prípade použi názov nadradenej zložky alebo sa opýtaj
 - `date`: Dnešný dátum
 - `description`: Prvá veta z textu, skrátená na max 160 znakov
 - `nav_icon`: Podľa typu detekovaného obsahu:
@@ -231,10 +235,20 @@ Ak si vybral "Preložiť do slovenčiny":
 
 ## 7. VÝSTUP
 
-- **Cesta**: Flexibilne - ponúkni voľbu:
-  - Špecifická cesta od používateľa
+- **Cesta mimo Hugo projektu**: Flexibilne - ponúkni voľbu:
+  - Špecifická absolútna alebo relatívna cesta od používateľa
   - Alternatíva: `[pôvodné_meno]_formatted.md`
   - Alternatíva: Uložiť do aktuálneho adresára
+- **Cesta v Hugo projekte**: Najprv zisti koreň projektu podľa `hugo.toml`, `hugo.yaml` alebo `hugo.json` a over adresár `content/`.
+  - Preskúmaj celú štruktúru pod `content/`, nie iba `content/docs/`.
+  - V najbližšej relevantnej sekcii porovnaj existujúce tvary: ploché súbory `nazov.md`, Branch Bundles `nazov/_index.md` a Leaf Bundles `nazov/index.md`.
+  - Ak vstup končí na `_index.txt`, zachovaj tvar a navrhni `_index.md`.
+  - Ak vstup končí na `index.txt`, zachovaj tvar a navrhni `index.md`.
+  - Pri vstupe ako `content/sekcia/nazov.txt` preferuj konvenciu najbližšej sekcie, nie globálnu konvenciu celého projektu.
+  - Obsah sekcie alebo rozcestníka smeruj do `_index.md`; samostatný dokument s vlastným adresárom alebo assetmi smeruj do `index.md`; ploché články ponechaj ako `nazov.md`.
+  - Toto rozlíšenie používaj iba vtedy, keď ho podporuje kontext projektu alebo vstupu.
+  - Ak sú možné viaceré formy alebo kontext nie je jednoznačný, vždy zastav a opýtaj sa používateľa. Nikdy si typ bundle svojvoľne nevyberaj.
+- Pred zápisom vždy zobraz presnú cieľovú cestu vrátane názvu súboru a vyžiadaj si potvrdenie.
 - **Formát**: Čistý markdown (`.md`) alebo s frontmatter (`.md`)
 - **Kvalita**: Production-ready - všetko je správne formátované a pripravené na publikovanie
 
@@ -268,7 +282,17 @@ Výstup:
 - Výsledok: tools_formatted.md
 ```
 
-## 9. INTERAKTÍVNE OTÁZKY (VOPRED SPÝTAJ SA)
+## 9. DETEKCIA HUGO CESTY A INTERAKTÍVNE OTÁZKY
+
+Ak vstup patrí do Hugo projektu, pred návrhom výstupu:
+
+1. Nájdi koreň podľa `hugo.toml`, `hugo.yaml` alebo `hugo.json` a over `content/`.
+2. Zisti najbližšiu relevantnú sekciu podľa umiestnenia vstupného súboru.
+3. Preskúmaj Markdown súbory v tejto sekcii a porovnaj lokálne konvencie.
+4. Zohľadni typ obsahu: sekcia alebo rozcestník, samostatný dokument alebo plochý článok.
+5. Zohľadni názov vstupu, najmä `_index.txt` a `index.txt`.
+6. Ak existuje iba jeden rozumný výsledok, zobraz ho používateľovi na potvrdenie.
+7. Ak existuje viac rovnako pravdepodobných výsledkov, zobraz všetky možnosti a opýtaj sa. Bez odpovede nezapisuj.
 
 ```
 1. Formát výstupu?
@@ -284,7 +308,12 @@ Výstup:
    → Automatický / Custom
 
 5. Cesta pre uloženie?
-   → Aktuálny adresár / Custom cesta
+   → Automatická Hugo cesta / Custom absolútna alebo relatívna cesta
+
+6. Ak Hugo kontext nie je jednoznačný:
+   → Branch Bundle: `<sekcia>/<názov>/_index.md`
+   → Leaf Bundle: `<sekcia>/<názov>/index.md`
+   → Plochý súbor: `<sekcia>/<názov>.md`
 ```
 
 ## 10. BEZPEČNOSTNÝ PROTOKOL
@@ -305,15 +334,18 @@ git status --porcelain
 
 1. **Prečítaj** `.txt` súbor
 2. **Opýtaj** sa na: formát, jazyk
-3. **Analyzuj** obsah: články vs. zoznamy
-4. **Detekuj** jazyk zdrojového textu
-5. **Transformuj** podľa schémy (články/zoznamy/zmiešané)
-6. **Generuj** frontmatter (ak si vybral)
-7. **Prelož** do SK (ak si vybral)
-8. **Validuj** markdown syntaxu
-9. **Git check**: `git status --porcelain`
-10. **Zapis** s potvrdením
-11. **Výstup**: Production-ready markdown
+3. **Zisti** Hugo kontext v celom `content/`, ak existuje
+4. **Analyzuj** obsah: články vs. zoznamy
+5. **Detekuj** jazyk zdrojového textu
+6. **Navrhni** cieľový tvar: plochý súbor, `_index.md` alebo `index.md`
+7. **Opýtaj** sa vždy, keď cesta alebo typ bundle nie je jednoznačný
+8. **Transformuj** podľa schémy (články/zoznamy/zmiešané)
+9. **Generuj** frontmatter (ak si vybral)
+10. **Prelož** do SK (ak si vybral)
+11. **Validuj** markdown syntaxu
+12. **Git check**: `git status --porcelain`
+13. **Zapis** s potvrdením presnej cieľovej cesty
+14. **Výstup**: Production-ready markdown
 
 ---
 
