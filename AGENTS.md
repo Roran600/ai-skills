@@ -15,6 +15,9 @@ ai-skills/
 ├── hugo-link-indexer/      # URL verification and Hugo Markdown link indexer
 │   ├── SKILL.md           # Instructions for categorized link tables with EXA
 │   └── LICENSE.txt
+├── hugo-article-creator/   # Safe creator for new Hugo articles and documentation cards
+│   ├── SKILL.md           # Instructions for article creation with EXA and approval gates
+│   └── LICENSE.txt
 ├── markdown-formatter/     # TXT to Markdown converter skill
 │   ├── SKILL.md           # Instructions for formatting .txt files to rich markdown
 │   └── LICENSE.txt
@@ -55,6 +58,7 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - **deep-factcheck:** Fact-checks Hugo articles by extracting 7 key claims and verifying them via EXA Search MCP. Generates detailed report with sources and recommended corrections. No automatic commits.
 - **deep-research:** Conducts research on any topic via EXA Search MCP. Generates flexible output (.txt, .md, or .md+frontmatter). Supports filtering (academic, technical, news), translation to Slovak, and detailed metadata. No automatic commits.
 - **hugo-link-indexer:** Verifies user-provided URLs via EXA, classifies them into category headings, and appends entries to Markdown tables only after confirmation. Never rewrites Hugo front matter or existing records without confirmation.
+- **hugo-article-creator:** Creates new Blog and Docs Markdown content from approved front matter and type-specific skeletons; uses EXA for descriptions and device data, checks Git state, and never overwrites existing files.
 - **image-generation:** Generates images via OpenRouter MCP (`tools/call generate-image`). Pure Bash: `img.sh` (~1150 lines) with subcommands `menu`, `gen`, `models`, `size`, `extract`, `upscale`, `reffacts`, `mcp`. Model ranking pulls three MCP sources (`list-models` for price, `list-models sort=throughput` as a speed proxy, `list-benchmarks source=design-arena` for measured elo/win-rate/generation-time); `models <price|speed|quality> [N]` and the interactive menu router expose them. Deps: curl, jq, base64, awk, file, magick. Interactive `menu` is for humans (asks where to save first, then model/ratio/resolution/prompts/upscale); agents must use `menu --non-interactive --yes` and address the script by absolute path, since it is neither in the user's cwd nor on PATH. When a user asks for the menu without a TTY, agents run `menu --questions` (a fixed questionnaire) and then generate non-interactively rather than handing the command back. MCP accepts only `model`, `prompt`, `size` – no input images, so references become text in the prompt. Saves image + JSON sidecar + raw MCP response. No automatic commits.
 - **frontend-design:** No generated content; guidance only. Designed to be invoked as context, not output.
 

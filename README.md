@@ -9,6 +9,7 @@ Zbierka mojich AI skillov čo používam v Opencode.
 - **deep-factcheck** - Fact-checker Hugo články s EXA vyhľadávaním a overením faktov
 - **hugo-search** - Bezpečný asistent pre Hugo Wiki s Git kontrolou
 - **hugo-link-indexer** - Overovanie a postupné dopĺňanie odkazov do Hugo Markdown zoznamov
+- **hugo-article-creator** - Bezpečný tvorca nových Hugo článkov a dokumentačných kariet s EXA research workflow
 
 ### **Generation & Media**
 - **image-generation** - Generovanie obrázkov cez OpenRouter MCP s batch, upscaling, reference images a dynamickým výberom modelov
