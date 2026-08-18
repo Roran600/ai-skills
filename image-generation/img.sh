@@ -1092,11 +1092,11 @@ cmd_menu() {
   fi
 
   if ! is_tty; then
-    err "'menu' is interactive and needs a TTY (exit $EX_NO_TTY)."
-    err "AGENT: do not hand this back to the user. Run '$SELF menu --questions',"
-    err "  ask the user those questions, then run 'menu --non-interactive --yes ...'."
-    err "HUMAN: for the full interactive picker, run '$SELF menu' in your own terminal."
-    exit $EX_NO_TTY
+    # OpenCode invokes skills without a terminal. Fall back to the same
+    # parameter questionnaire instead of returning an unusable TTY error.
+    info "No TTY detected; showing the safe menu questionnaire. Nothing will be spent."
+    menu_questions
+    return 0
   fi
 
   # First question of the session: where do the images go. Skipped when -o was given.

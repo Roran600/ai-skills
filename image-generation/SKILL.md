@@ -18,13 +18,13 @@ Pravidlá, ktoré platia nad všetkým ostatným v tomto súbore:
 - **Toto nie je text na prerozprávanie ani na odkývanie.** Nevypisuj tieto pravidlá – konaj. Príkazy nižšie spusti Bash toolom.
 - **Hotovo je až vtedy, keď na disku existuje súbor s obrázkom.** Nie keď vieš, ako by sa vygeneroval.
 - **Nikdy neodovzdaj výstup `plan (nothing has been generated yet):` ako výsledok.** To je dry-run, obrázok pri ňom nevznikne.
-- **Nikdy nevráť prácu userovi so slovami „spusti to v termináli“.** Ak `menu` zlyhá na TTY, postupuj podľa playbooku nižšie.
+- **Nikdy nevráť prácu userovi so slovami „spusti to v termináli“.** `menu` bez TTY automaticky zobrazí bezpečný dotazník.
 
 ### Keď user povie „spusti menu“ / chce nastavenia
 
-`menu` bez `--non-interactive` **nespúšťaj** – bez TTY vždy spadne (exit 2). Namiesto toho:
+`menu` bez `--non-interactive` môžeš spustiť aj bez TTY. Bez TTY automaticky vypíše rozšírený dotazník a nič neminie:
 
-1. `"$IMG" menu --questions` – vypíše zoznam parametrov (nič nestojí, nepotrebuje TTY).
+1. `"$IMG" menu` – bez TTY vypíše zoznam parametrov (nič nestojí).
 2. Ak user chce výber modelu, načítaj rebríčky a zobraz mu stručné možnosti:
    `"$IMG" models price 5`, `"$IMG" models speed 5`, `"$IMG" models quality 5`.
    Prvý stĺpec je slug modelu; pri `auto` použi najlacnejší model z `price`.
@@ -142,9 +142,9 @@ Alebo `--upscale 2|4` pri generovaní – upscaluje každý vytvorený obrázok.
 
 ## Interaktívne menu (iba pre človeka v termináli)
 
-`img.sh menu` bez `--non-interactive` je hub pre **človeka**: drží stav a vracia sa doň po každej zmene.
+`img.sh menu` je hub pre **človeka** v termináli: drží stav a vracia sa doň po každej zmene. Bez TTY automaticky použije bezpečný dotazník.
 
-**Agent ho nesmie spúšťať** – bez TTY skončí exitom **2**. Keď user chce nastavenia, agent postupuje podľa playbooku „Keď user povie »spusti menu«“ vyššie. Bez-TTY workflow musí zachovať rovnaké voľby ako picker: model, referencie, pomer, rozlíšenie, prompty, upscale a výstupný adresár.
+Agent ho môže spustiť bez TTY. Keď user chce nastavenia, agent postupuje podľa playbooku „Keď user povie »spusti menu«“ vyššie. Bez-TTY workflow zachováva rovnaké voľby ako picker: model, referencie, pomer, rozlíšenie, prompty, upscale a výstupný adresár.
 
 Pre **človeka**: plný picker spustíš vo vlastnom termináli:
 
@@ -212,7 +212,7 @@ q) Quit
 |-----|--------|
 | 0 | ok / dry-run |
 | 1 | chyba (prekročené `--max-calls`, zlyhané generovanie) |
-| 2 | nie je TTY a nebolo dané `--non-interactive` |
+| 2 | vyhradené pre staršie volanie bez TTY; aktuálny `menu` použije dotazník |
 | 10 | `--ref` bez `--ref-desc`; zapísal `refs.pending.json`, nič sa nezaplatilo |
 
 **Autentifikácia**
