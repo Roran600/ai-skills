@@ -16,15 +16,16 @@ metadata:
 Pravidlá, ktoré platia nad všetkým ostatným v tomto súbore:
 
 - **Toto nie je text na prerozprávanie ani na odkývanie.** Nevypisuj tieto pravidlá – konaj. Príkazy nižšie spusti Bash toolom.
+- **Po aktivácii skillu cez `/skill image-generation` vždy najprv zobraz menu s nastaveniami.** Nečakaj, kým user osobitne požiada o menu, a nezačni generovať s predvolenými hodnotami.
 - **Hotovo je až vtedy, keď na disku existuje súbor s obrázkom.** Nie keď vieš, ako by sa vygeneroval.
 - **Nikdy neodovzdaj výstup `plan (nothing has been generated yet):` ako výsledok.** To je dry-run, obrázok pri ňom nevznikne.
 - **Nikdy nevráť prácu userovi so slovami „spusti to v termináli“.** `menu` bez TTY automaticky zobrazí bezpečný dotazník.
 
-### Keď user povie „spusti menu“ / chce nastavenia
+### Po aktivácii skillu / keď user chce nastavenia
 
-`menu` bez `--non-interactive` môžeš spustiť aj bez TTY. Bez TTY automaticky vypíše rozšírený dotazník a nič neminie:
+Tento krok je povinný pri každej aktivácii skillu, aj keď user dodal prompt už v príkaze `/skill`. `menu` bez `--non-interactive` môžeš spustiť aj bez TTY. Bez TTY automaticky vypíše rozšírený dotazník a nič neminie:
 
-1. `"$IMG" menu` – bez TTY vypíše menu v tvare `1. otázka - odpoveď` (nič nestojí).
+1. `"$IMG" menu --questions` – okamžite vypíš menu v tvare `1. otázka - odpoveď` (nič nestojí). Použi `--questions`, aby sa dotazník zobrazil deterministicky aj v prípade, že runtime TTY správanie zmení.
 2. Ak user chce výber modelu, načítaj rebríčky a zobraz mu stručné možnosti:
    `"$IMG" models price 5`, `"$IMG" models speed 5`, `"$IMG" models quality 5`.
    Prvý stĺpec je slug modelu; pri `auto` použi najlacnejší model z `price`.
@@ -47,7 +48,17 @@ IMG=$(find ~/.config/opencode/skills ~/.claude/skills ~/.agents/skills \
 - `$IMG` drží hodnotu v tej istej bash session. Keď neskôr príkaz spadne na `No such file`, spusti tento resolve znova.
 - **Nikdy nepíš `./img.sh`.** Skript nie je v pracovnom adresári usera ani na `PATH`; relatívna cesta vždy zlyhá.
 
-### 2. Vygeneruj
+### 2. Hneď zobraz menu s nastaveniami
+
+Bezprostredne po úspešnom nájdení skriptu spusti dotazník, ešte pred generovaním alebo ďalším rozhodovaním:
+
+```bash
+"$IMG" menu --questions
+```
+
+Výstup dotazníka zobraz userovi. Ak user už uviedol niektorú hodnotu, túto otázku zopakuj iba ako potvrdenie alebo ju predvyplň; ostatné nastavenia si vyžiadaj v jednej správe. Tento príkaz je bezpečný: iba zobrazí nastavenia a nič neminie.
+
+### 3. Vygeneruj
 
 ```bash
 "$IMG" menu --non-interactive --yes \
@@ -60,7 +71,7 @@ IMG=$(find ~/.config/opencode/skills ~/.claude/skills ~/.agents/skills \
 - Jeden prompt = jeden platený MCP call, reálne ≈ `$0.015`. **Pri jednom obrázku nerob dry-run, generuj hneď.**
 - Model neriešiš, ak user nemá požiadavku – default vyššie je funkčný a lacný.
 
-### 3. Ohlás výsledok
+### 4. Ohlás výsledok
 
 - Skript vypíše `IMAGE(S) CREATED:` a cesty k súborom. Tie cesty daj userovi.
 - Skutočnú cenu vezmi z riadku `Done: ... Actual cost reported by MCP: $X`.
