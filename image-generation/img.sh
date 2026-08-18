@@ -695,15 +695,15 @@ menu_browse_models() { # <price|speed|quality>
   pages=$(( (total + per - 1) / per ))
   while true; do
     ui ""
-    ui "  Model by $cat - page $((page+1))/$pages   ($total models)"
+    ui "  Modely - kategória: $cat - strana $((page+1))/$pages ($total modelov)"
     printf "      %-40s %-15s %-10s %s\n" "model" "price" "quality" "speed" >&2
     start=$((page*per)); end=$((start+per)); (( end > total )) && end=$total
     for (( i=start; i<end; i++ )); do
-      printf "  %2d) %s\n" "$((i+1))" "${lines[$i]}" >&2
+      printf "  %2d. %s\n" "$((i+1))" "${lines[$i]}" >&2
     done
-    ui "  n) next   p) prev   m) manual slug   b) back"
+    ui "  n. ďalšia strana   p. predchádzajúca   m. manuálny slug   b. späť"
     ui "  (price is per-token, NOT per-image; speed ~rN = throughput proxy - see SKILL.md)"
-    local c; ask c "  number 1-$total (or n/p/m/b): " ""
+    local c; ask c "  Otázka - číslo modelu 1-$total / n / p / m / b - odpoveď: " ""
     case "$c" in
       n|N) if (( page < pages-1 )); then page=$((page+1)); else err "last page"; fi;;
       p|P) if (( page > 0 )); then page=$((page-1)); else err "first page"; fi;;
@@ -718,26 +718,26 @@ menu_browse_models() { # <price|speed|quality>
 
 menu_pick_model() {
   ui ""
-  ui "  Choose model by:"
-  ui "    1) price    - cheapest first"
-  ui "    2) speed    - fastest first (10 measured, rest ~throughput proxy)"
-  ui "    3) quality  - highest design-arena elo first (measured only)"
-  ui "    a) auto     - cheapest in the catalogue"
-  ui "    m) manual   - type a slug"
-  ui "    b) back"
-  local c; ask c "  choice [a]: " "a"
+  ui "  Výber modelu"
+  ui "    1. price - najlacnejšie modely"
+  ui "    2. speed - najrýchlejšie modely"
+  ui "    3. quality - najkvalitnejšie modely"
+  ui "    4. auto - najlacnejší dostupný model"
+  ui "    5. manual - zadať slug modelu"
+  ui "    6. späť"
+  local c; ask c "  Otázka - kategória modelu 1-6 - odpoveď: " "4"
   case "${c:-a}" in
     1) menu_browse_models price;;
     2) menu_browse_models speed;;
     3) menu_browse_models quality;;
-    a|A)
+    4|a|A)
       local first
       first=$(models_cache | awk 'NR==1{print $1}')
       [[ -n "$first" ]] || { err "catalogue empty"; return; }
       M_MODEL=$first; M_MODEL_SRC="auto: lowest catalogue price"
       ;;
-    m|M) menu_manual_slug;;
-    b|B|"") return;;
+    5|m|M) menu_manual_slug;;
+    6|b|B|"") return;;
     *) err "unknown choice: $c";;
   esac
 }
@@ -797,9 +797,9 @@ menu_pick_from_list() { # menu_pick_from_list <varname> <current> <items...>
   ui ""
   for (( i=0; i<${#items[@]}; i++ )); do
     local mark=" "; [[ "${items[$i]}" == "$cur" ]] && mark="*"
-    printf "  %s %d) %s\n" "$mark" "$((i+1))" "${items[$i]}" >&2
+    printf "  %s %d. %s\n" "$mark" "$((i+1))" "${items[$i]}" >&2
   done
-  local n; ask n "  number: " ""
+  local n; ask n "  Otázka - vyber číslo - odpoveď: " ""
   if [[ "$n" =~ ^[0-9]+$ ]] && (( n >= 1 && n <= ${#items[@]} )); then
     printf -v "$__var" '%s' "${items[$((n-1))]}"
   fi
@@ -928,16 +928,16 @@ menu_summary() {
   calls=${#M_PROMPTS[@]}
   ui ""
   ui "=============== img.sh menu ==============="
-  printf "  1) Model            : %s   [%s]\n" "${M_MODEL:-<unset>}" "$M_MODEL_SRC" >&2
-  printf "  2) References       : %d (palette in brief: %s)\n" "${#M_REF_PATHS[@]}" "$( ((M_PALETTE)) && echo yes || echo no )" >&2
-  printf "  3) Aspect ratio     : %s\n" "$M_RATIO" >&2
-  printf "  4) Resolution       : %-4s -> %s\n" "$M_TIER" "$size" >&2
-  printf "  5) Prompts          : %d\n" "$calls" >&2
-  printf "  6) Upscale after gen: %s\n" "${M_UPSCALE:-off}" >&2
-  ui "  7) Upscale an existing image..."
-  ui "  8) Output dir       : $M_OUTDIR"
-  printf "  g) Generate         (%d paid call(s))\n" "$calls" >&2
-  ui "  q) Quit"
+  printf "  1. Model - odpoveď: %s [%s]\n" "${M_MODEL:-<unset>}" "$M_MODEL_SRC" >&2
+  printf "  2. Referencie - odpoveď: %d (paleta: %s)\n" "${#M_REF_PATHS[@]}" "$( ((M_PALETTE)) && echo áno || echo nie )" >&2
+  printf "  3. Pomer strán - odpoveď: %s\n" "$M_RATIO" >&2
+  printf "  4. Rozlíšenie - odpoveď: %-4s -> %s\n" "$M_TIER" "$size" >&2
+  printf "  5. Prompty - odpoveď: %d\n" "$calls" >&2
+  printf "  6. Upscale po generovaní - odpoveď: %s\n" "${M_UPSCALE:-vypnuté}" >&2
+  ui "  7. Upscale existujúceho obrázka"
+  ui "  8. Výstupný adresár - odpoveď: $M_OUTDIR"
+  printf "  g. Generovať - odpoveď: áno (%d platených callov)\n" "$calls" >&2
+  ui "  q. Ukončiť"
   ui "==========================================="
 }
 
@@ -1013,22 +1013,28 @@ write_pending_refs() {
 # a weak one has nothing to improvise. Prints to stdout, needs no TTY.
 menu_questions() {
   cat <<EOF
-Ask the user these, then generate. Values in [] are defaults - keep them if the user does not care.
-  1) Prompt(s)    : (required) what to draw, in English, be specific; one per image
-  2) Model        : [auto] auto / price / speed / quality / manual slug
-  3) Aspect ratio : [16:9] one of 1:1 16:9 9:16 4:3 3:4 21:9
-  4) Resolution   : [2K]   one of 1K 2K 4K
-  5) References   : [none] image paths and a short subject/style description for each
-  6) Palette      : [yes] include measurable reference palette in the prompt? yes/no
-  7) Upscale      : [off] upscale generated outputs by 2 or 4, or off
-  8) Output dir   : [current directory] any path
-  9) Max calls    : [4] safety limit for the number of prompts
+MENU - otázky a odpovede
+Hodnoty v hranatých zátvorkách sú predvolené.
 
-If model is not auto, first show the user five rows from the requested ranking:
+1. Prompt(y) - odpoveď: (povinné) čo nakresliť; jeden prompt na obrázok, po anglicky a konkrétne
+2. Model - odpoveď: [auto] auto / price / speed / quality / manual slug
+3. Pomer strán - odpoveď: [16:9] 1:1 / 16:9 / 9:16 / 4:3 / 3:4 / 21:9
+4. Rozlíšenie - odpoveď: [2K] 1K / 2K / 4K
+5. Referencie - odpoveď: [none] cesty k obrázkom a krátky popis subjektu/štýlu
+6. Paleta - odpoveď: [yes] zahrnúť paletu referencie do promptu? yes/no
+7. Upscale - odpoveď: [off] vypnuté / 2 / 4
+8. Výstupný adresár - odpoveď: [current directory] ľubovoľná cesta
+9. Max calls - odpoveď: [4] bezpečnostný limit počtu promptov
+
+Ak model nie je auto, najprv zobraz päť modelov z vybranej kategórie:
   $SELF models price 5
   $SELF models speed 5
   $SELF models quality 5
-Use the first column as the model slug. Then run one --prompt per image:
+Výber modelu:
+1. Kategória - odpoveď: price / speed / quality
+2. Model - odpoveď: číslo modelu z tabuľky alebo manual slug
+
+Po odpovediach spusti jeden --prompt na obrázok:
   $SELF menu --non-interactive --yes -m <model> -r <ratio> -q <tier> -o <dir> \
     [--ref <path> --ref-desc "<description>"] [--no-palette] [--upscale 2|4] \
     --max-calls <N> --prompt "<prompt>"
@@ -1104,7 +1110,7 @@ cmd_menu() {
 
   while true; do
     menu_summary
-    local c; ask c "  choice: " ""
+    local c; ask c "  Otázka - číslo parametra / g / q - odpoveď: " ""
     case "$c" in
       1) menu_pick_model;;
       2) menu_refs;;

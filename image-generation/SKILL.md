@@ -24,11 +24,11 @@ Pravidlá, ktoré platia nad všetkým ostatným v tomto súbore:
 
 `menu` bez `--non-interactive` môžeš spustiť aj bez TTY. Bez TTY automaticky vypíše rozšírený dotazník a nič neminie:
 
-1. `"$IMG" menu` – bez TTY vypíše zoznam parametrov (nič nestojí).
+1. `"$IMG" menu` – bez TTY vypíše menu v tvare `1. otázka - odpoveď` (nič nestojí).
 2. Ak user chce výber modelu, načítaj rebríčky a zobraz mu stručné možnosti:
    `"$IMG" models price 5`, `"$IMG" models speed 5`, `"$IMG" models quality 5`.
    Prvý stĺpec je slug modelu; pri `auto` použi najlacnejší model z `price`.
-3. Polož userovi všetky potrebné otázky v **jednej** správe. Na čo už odpoveď máš, sa nepýtaj.
+3. Polož userovi všetky potrebné otázky v **jednej** správe vo formáte `1. otázka - odpoveď`, vrátane parametrov a výberu modelu. Na čo už odpoveď máš, sa nepýtaj.
 4. Po odpovedi zostav príkaz s vybranými parametrami a generuj cez
    `--non-interactive --yes`; menu nesmie skončiť iba dry-run plánom.
 
@@ -142,7 +142,7 @@ Alebo `--upscale 2|4` pri generovaní – upscaluje každý vytvorený obrázok.
 
 ## Interaktívne menu (iba pre človeka v termináli)
 
-`img.sh menu` je hub pre **človeka** v termináli: drží stav a vracia sa doň po každej zmene. Bez TTY automaticky použije bezpečný dotazník.
+`img.sh menu` je hub pre **človeka** v termináli: drží stav a vracia sa doň po každej zmene. Bez TTY automaticky použije prehľadné menu vo formáte otázka/odpoveď.
 
 Agent ho môže spustiť bez TTY. Keď user chce nastavenia, agent postupuje podľa playbooku „Keď user povie »spusti menu«“ vyššie. Bez-TTY workflow zachováva rovnaké voľby ako picker: model, referencie, pomer, rozlíšenie, prompty, upscale a výstupný adresár.
 
@@ -168,16 +168,16 @@ Prvá otázka po štarte je, kam sa obrázky uložia:
 Potom nasleduje hub:
 
 ```
-1) Model            : black-forest-labs/flux.2-klein-4b   [auto: lowest catalogue price]
-2) References       : 1 (palette in brief: yes)
-3) Aspect ratio     : 16:9
-4) Resolution       : 2K   -> 2728x1536
-5) Prompts          : 2
-6) Upscale after gen: 2
-7) Upscale an existing image...
-8) Output dir       : /home/user/projekt
-g) Generate         (2 paid call(s))
-q) Quit
+1. Model - odpoveď: black-forest-labs/flux.2-klein-4b [auto: lowest catalogue price]
+2. Referencie - odpoveď: 1 (paleta: áno)
+3. Pomer strán - odpoveď: 16:9
+4. Rozlíšenie - odpoveď: 2K -> 2728x1536
+5. Prompty - odpoveď: 2
+6. Upscale po generovaní - odpoveď: 2
+7. Upscale existujúceho obrázka
+8. Výstupný adresár - odpoveď: /home/user/projekt
+g. Generovať - odpoveď: áno (2 platené call-y)
+q. Ukončiť
 ```
 
 - **1** rozcestník `1) price  2) speed  3) quality  a) auto  m) manual  b) back`. Kategórie otvoria stránkovaný rebríček (5 na stranu, globálne číslovanie 1–20, `n`/`p` listovanie, `m` manuál, `b` späť) s cenou, elo/win % a rýchlosťou pri každom modeli. `a` auto = najlacnejší z katalógu, `m` manuálny slug s validáciou cez `get-model` (zadarmo).
