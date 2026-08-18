@@ -18,10 +18,16 @@ Zbierka mojich AI skillov čo používam v Opencode.
 ### **Design**
 - **frontend-design** - Guidance na distinktívny a zámýšľaný vizuálny dizajn
 
+## Licencia   
+
+Ak neni uvedené inak každý skill má licenciu v odpovedajúcej zložke. 
+
 ## Dokumentácia a ďalšie stránky 
 
 - [OpenCode Dokumentácia — Skilly](https://opencode.ai/docs/skills/) 
 - [OpenCode Dokumentácia — MCP](https://opencode.ai/docs/mcp-servers/)
+- [OpenRouter - Prompt and Parameters (Image Generation)](https://openrouter.ai/docs/guides/overview/multimodal/image-generation#prompt-and-parameters)
+- [OpenRouter - OpenCode (MCP Server)](https://openrouter.ai/docs/guides/overview/mcp-server#opencode) 
 - [EXA Search MCP dokumentácia](https://exa.ai/docs/reference/exa-mcp#opencode)
 - [OpenRouter API dokumentácia](https://openrouter.ai/docs)
 - [Verejná databáza skillov - skills.sh](https://www.skills.sh/)
