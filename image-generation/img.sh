@@ -1014,13 +1014,24 @@ write_pending_refs() {
 menu_questions() {
   cat <<EOF
 Ask the user these, then generate. Values in [] are defaults - keep them if the user does not care.
-  1) Prompt      : (required) what to draw, in English, be specific
-  2) Aspect ratio: [16:9]  one of 1:1 16:9 9:16 4:3 3:4 21:9
-  3) Resolution  : [2K]    one of 1K 2K 4K
-  4) Output dir  : [current directory]  any path
-  5) Model       : [black-forest-labs/flux.2-klein-4b]  only if the user wants another
-Then run (one --prompt per image):
-  $SELF menu --non-interactive --yes -m <model> -r <ratio> -q <tier> -o <dir> --prompt "<prompt>"
+  1) Prompt(s)    : (required) what to draw, in English, be specific; one per image
+  2) Model        : [auto] auto / price / speed / quality / manual slug
+  3) Aspect ratio : [16:9] one of 1:1 16:9 9:16 4:3 3:4 21:9
+  4) Resolution   : [2K]   one of 1K 2K 4K
+  5) References   : [none] image paths and a short subject/style description for each
+  6) Palette      : [yes] include measurable reference palette in the prompt? yes/no
+  7) Upscale      : [off] upscale generated outputs by 2 or 4, or off
+  8) Output dir   : [current directory] any path
+  9) Max calls    : [4] safety limit for the number of prompts
+
+If model is not auto, first show the user five rows from the requested ranking:
+  $SELF models price 5
+  $SELF models speed 5
+  $SELF models quality 5
+Use the first column as the model slug. Then run one --prompt per image:
+  $SELF menu --non-interactive --yes -m <model> -r <ratio> -q <tier> -o <dir> \
+    [--ref <path> --ref-desc "<description>"] [--no-palette] [--upscale 2|4] \
+    --max-calls <N> --prompt "<prompt>"
 EOF
 }
 

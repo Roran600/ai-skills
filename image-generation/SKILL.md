@@ -24,9 +24,13 @@ Pravidlá, ktoré platia nad všetkým ostatným v tomto súbore:
 
 `menu` bez `--non-interactive` **nespúšťaj** – bez TTY vždy spadne (exit 2). Namiesto toho:
 
-1. `"$IMG" menu --questions` – vypíše fixný zoznam otázok s defaultmi (nič nestojí, nepotrebuje TTY).
-2. Polož userovi tie otázky v **jednej** správe. Na čo už odpoveď máš, sa nepýtaj.
-3. Po odpovedi generuj rovno krokom 2 nižšie (`--non-interactive --yes`).
+1. `"$IMG" menu --questions` – vypíše zoznam parametrov (nič nestojí, nepotrebuje TTY).
+2. Ak user chce výber modelu, načítaj rebríčky a zobraz mu stručné možnosti:
+   `"$IMG" models price 5`, `"$IMG" models speed 5`, `"$IMG" models quality 5`.
+   Prvý stĺpec je slug modelu; pri `auto` použi najlacnejší model z `price`.
+3. Polož userovi všetky potrebné otázky v **jednej** správe. Na čo už odpoveď máš, sa nepýtaj.
+4. Po odpovedi zostav príkaz s vybranými parametrami a generuj cez
+   `--non-interactive --yes`; menu nesmie skončiť iba dry-run plánom.
 
 Plné interaktívne TUI vie spustiť len user vo vlastnom termináli (`"$IMG" menu`) – ponúkni to nanajvýš ako druhú možnosť, nie ako svoju odpoveď.
 
@@ -140,7 +144,7 @@ Alebo `--upscale 2|4` pri generovaní – upscaluje každý vytvorený obrázok.
 
 `img.sh menu` bez `--non-interactive` je hub pre **človeka**: drží stav a vracia sa doň po každej zmene.
 
-**Agent ho nesmie spúšťať** – bez TTY skončí exitom **2**. Keď user chce nastavenia, agent postupuje podľa playbooku „Keď user povie »spusti menu«“ vyššie (`menu --questions` → otázky → generovanie), **nie** odovzdaním príkazu späť.
+**Agent ho nesmie spúšťať** – bez TTY skončí exitom **2**. Keď user chce nastavenia, agent postupuje podľa playbooku „Keď user povie »spusti menu«“ vyššie. Bez-TTY workflow musí zachovať rovnaké voľby ako picker: model, referencie, pomer, rozlíšenie, prompty, upscale a výstupný adresár.
 
 Pre **človeka**: plný picker spustíš vo vlastnom termináli:
 
