@@ -1,37 +1,51 @@
-# R60 Skills
+# R60 AI Skills
 
-Zbierka mojich AI skillov čo používam v Opencode.
+Zbierka skillov pre [OpenCode](https://opencode.ai/), zameraná na research, Hugo obsah, dizajn a prácu s médiami.
 
 ## Skilly
 
-### **Research & Content**
-- **deep-research** - Výskumný asistent s EXA Search MCP (viacero formátov: .txt, .md, .md+frontmatter)
-- **deep-factcheck** - Fact-checker Hugo články s EXA vyhľadávaním a overením faktov
-- **hugo-search** - Bezpečný asistent pre Hugo Wiki s Git kontrolou
-- **hugo-link-indexer** - Overovanie a postupné dopĺňanie odkazov do Hugo Markdown zoznamov
-- **hugo-article-creator** - Bezpečný tvorca nových Hugo článkov a dokumentačných kariet s EXA research workflow
+### Research a obsah
 
-### **Generation & Media**
-- **image-generation** - Generovanie obrázkov cez OpenRouter MCP s batch, upscaling, reference images a dynamickým výberom modelov
-- **markdown-formatter** - Preformátovanie .txt súborov na bohatý Markdown
+| Skill | Popis | Zdroj |
+|---|---|---|
+| `deep-research` | Vyhľadá tému cez EXA MCP, deduplikuje zdroje a pripraví report v `.txt` alebo `.md`. | [`SKILL.md`](./deep-research/SKILL.md) |
+| `deep-factcheck` | Overí sedem kľúčových tvrdení v Hugo článku a vytvorí Markdown report. | [`SKILL.md`](./deep-factcheck/SKILL.md) |
+| `markdown-formatter` | Prevedie `.txt` súbory na štruktúrovaný Markdown, voliteľne s Hugo front matter. | [`SKILL.md`](./markdown-formatter/SKILL.md) |
 
-### **Design**
-- **frontend-design** - Guidance na distinktívny a zámýšľaný vizuálny dizajn
+### Hugo
 
-## Licencia   
+| Skill | Popis | Zdroj |
+|---|---|---|
+| `hugo-search` | Research asistent pre Hugo Wiki; vytvára obsah vo formáte Branch Bundle. | [`SKILL.md`](./hugo-search/SKILL.md) |
+| `hugo-article-creator` | Bezpečne vytvára nové Hugo články a dokumentačné karty s overením údajov cez EXA. | [`SKILL.md`](./hugo-article-creator/SKILL.md) |
+| `hugo-link-indexer` | Overuje URL cez EXA a po schválení dopĺňa odkazy do Hugo Markdown tabuliek. | [`SKILL.md`](./hugo-link-indexer/SKILL.md) |
 
-Ak neni uvedené inak každý skill má licenciu v odpovedajúcej zložke. 
+### Dizajn a médiá
 
-## Dokumentácia a ďalšie stránky 
+| Skill | Popis | Zdroj |
+|---|---|---|
+| `frontend-design` | Pomáha navrhovať výrazné a účelové frontend rozhrania. | [`SKILL.md`](./frontend-design/SKILL.md) |
+| `image-generation` | Generuje obrázky cez OpenRouter MCP vrátane batch generovania, upscalingu a výberu modelu. | [`SKILL.md`](./image-generation/SKILL.md) |
+| `gimp-mcp` | Bezpečný workflow na kontrolu, úpravu a export bitmapových obrázkov v GIMPe. | [`SKILL.md`](./gimp-mcp/SKILL.md) |
+| `inkscape-mcp` | Workflow pre tvorbu, úpravu, validáciu a export SVG a ďalších vektorových formátov. | [`SKILL.md`](./inkscape-mcp/SKILL.md) |
 
-- [OpenCode Dokumentácia — Skilly](https://opencode.ai/docs/skills/) 
-- [OpenCode Dokumentácia — MCP](https://opencode.ai/docs/mcp-servers/)
-- [OpenRouter - Prompt and Parameters (Image Generation)](https://openrouter.ai/docs/guides/overview/multimodal/image-generation#prompt-and-parameters)
-- [OpenRouter - OpenCode (MCP Server)](https://openrouter.ai/docs/guides/overview/mcp-server#opencode) 
-- [EXA Search MCP dokumentácia](https://exa.ai/docs/reference/exa-mcp#opencode)
-- [OpenRouter API dokumentácia](https://openrouter.ai/docs)
-- [Verejná databáza skillov - skills.sh](https://www.skills.sh/)
+## Zásady
+
+Konkrétne pravidlá jednotlivých skillov sú zdokumentované priamo v ich `SKILL.md`. Viaceré obsahové skilly pred zápisom kontrolujú Git stav, vyžadujú potvrdenie pri necommitnutých zmenách a automaticky nevykonávajú Git commit ani push.
+
+## Dokumentácia
+
+- [OpenCode — Agent Skills](https://opencode.ai/docs/skills/)
+- [OpenCode — MCP servery](https://opencode.ai/docs/mcp-servers/)
+- [Exa MCP](https://exa.ai/docs/get-started/exa-mcp)
+- [OpenRouter MCP Server](https://openrouter.ai/docs/guides/overview/mcp-server)
+- [OpenRouter — Image Generation](https://openrouter.ai/docs/guides/overview/multimodal/image-generation)
+- [skills.sh — dokumentácia](https://www.skills.sh/docs)
+
+## Licencia
+
+Licenčné podmienky každého skillu sú uvedené v jeho vlastnom priečinku.
 
 ---
 
-**Aktualizácia:** August 2026
+**Aktualizované:** november 2026
