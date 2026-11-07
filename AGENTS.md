@@ -31,6 +31,8 @@ ai-skills/
 │   ├── SKILL.md           # Agent happy path first, then reference sections
 │   ├── img.sh             # Bash toolkit (menu/gen/models/size/extract/upscale/reffacts/mcp)
 │   └── LICENSE.txt        # MIT License
+├── gimp-mcp/               # Safe GIMP MCP editing workflow
+├── inkscape-mcp/           # Safe Inkscape MCP vector workflow
 └── README.md              # Brief overview (Slovak)
 ```
 
@@ -48,9 +50,16 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - `frontend-design`: English. Emphasizes distinctive, opinionated design choices grounded in the subject matter.
 
 **Skill Frontmatter:**
-- Required fields: `name`, `description`, `license`
-- Optional but used: `compatibility`, `metadata` (audience, workflow)
-- No spaces in `name` values; use hyphens
+- For portability, include `name` and `description`; use a lowercase hyphenated `name` matching the skill directory.
+- `license`, `compatibility`, and `metadata` are optional in the Agent Skills specification. This repository includes a license file with each skill.
+- When present, `compatibility` must be a text string and `metadata` a map of string keys and values for portable skills. OpenCode V2 may accept looser frontmatter; do not confuse portability guidance with its runtime requirements.
+- Existing exceptions: `gimp-mcp` and `inkscape-mcp` currently use display names with spaces in frontmatter. Update them to match their directory names when working on skill portability.
+- Reference: https://agentskills.io/specification and https://opencode.ai/docs/skills/
+
+**MCP tool names:**
+- Discover the tools exposed by the active client and server before use; prefixes and invocation syntax can differ between environments.
+- The official EXA server names include `web_search_exa` and `web_fetch_exa`. Existing skills may refer to prefixed names such as `exa_web_search_exa`; verify availability rather than assuming either spelling works everywhere.
+- References: https://github.com/exa-labs/exa-mcp-server and https://opencode.ai/docs/mcp-servers/
 
 **Content Guidelines:**
 - **hugo-search:** Content goes to `content/docs/[slug]/_index.md` as Branch Bundles. Must have specific YAML frontmatter (title, date, description, nav_weight, nav_icon, series, categories, tags). Skill enforces git safety checks before writing.
@@ -61,6 +70,8 @@ Each skill is self-contained in its own directory. The entrypoint is always `SKI
 - **hugo-article-creator:** Creates new Blog and Docs Markdown content from approved front matter and type-specific skeletons; uses EXA for descriptions and device data, checks Git state, and never overwrites existing files.
 - **image-generation:** Generates images via OpenRouter MCP (`tools/call generate-image`). Pure Bash: `img.sh` (~1150 lines) with subcommands `menu`, `gen`, `models`, `size`, `extract`, `upscale`, `reffacts`, `mcp`. Model ranking pulls three MCP sources (`list-models` for price, `list-models sort=throughput` as a speed proxy, `list-benchmarks source=design-arena` for measured elo/win-rate/generation-time); `models <price|speed|quality> [N]` and the interactive menu router expose them. Deps: curl, jq, base64, awk, file, magick. Interactive `menu` is for humans (asks where to save first, then model/ratio/resolution/prompts/upscale); agents must use `menu --non-interactive --yes` and address the script by absolute path, since it is neither in the user's cwd nor on PATH. When a user asks for the menu without a TTY, agents run `menu --questions` (a fixed questionnaire) and then generate non-interactively rather than handing the command back. MCP accepts only `model`, `prompt`, `size` – no input images, so references become text in the prompt. Saves image + JSON sidecar + raw MCP response. No automatic commits.
 - **frontend-design:** No generated content; guidance only. Designed to be invoked as context, not output.
+- **gimp-mcp:** Safe inspection, editing, and export of images through the configured GIMP MCP server; confirm destructive operations.
+- **inkscape-mcp:** Safe SVG and vector editing, conversion, rendering, and validation through the configured Inkscape MCP server; confirm potentially destructive operations.
 
 ## Common Tasks
 
