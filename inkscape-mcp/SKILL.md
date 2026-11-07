@@ -1,6 +1,7 @@
 ---
 name: Inkscape MCP Workflow
 description: Safely inspect, create, edit, convert, render, and validate SVG/vector assets through the configured local Inkscape MCP server.
+license: MIT
 ---
 
 Use this skill for SVG and vector work: creating or editing objects, paths,

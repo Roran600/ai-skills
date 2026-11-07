@@ -1,6 +1,7 @@
 ---
 name: GIMP MCP Editor
 description: Safely inspect, edit, and export GIMP images through the configured gimp-mcp server.
+license: MIT
 ---
 
 Use this skill for requests to inspect, create, edit, transform, export, or verify images in the user's open GIMP session.

@@ -29,9 +29,13 @@ Zbierka skillov pre [OpenCode](https://opencode.ai/), zameraná na research, Hug
 | `gimp-mcp` | Bezpečný workflow na kontrolu, úpravu a export bitmapových obrázkov v GIMPe. | [`SKILL.md`](./gimp-mcp/SKILL.md) |
 | `inkscape-mcp` | Workflow pre tvorbu, úpravu, validáciu a export SVG a ďalších vektorových formátov. | [`SKILL.md`](./inkscape-mcp/SKILL.md) |
 
-## Zásady
+## Bezpečnosť a pravidlá
 
-Konkrétne pravidlá jednotlivých skillov sú zdokumentované priamo v ich `SKILL.md`. Viaceré obsahové skilly pred zápisom kontrolujú Git stav, vyžadujú potvrdenie pri necommitnutých zmenách a automaticky nevykonávajú Git commit ani push.
+Každý skill má vlastné pravidlá uvedené v súbore `SKILL.md`. Pred jeho použitím si over najmä požiadavky na MCP servery a spôsob práce so súbormi.
+
+Niektoré skilly pred zápisom kontrolujú stav Git repozitára. Ak zistia necommitnuté zmeny, upozornia na ne a podľa pravidiel daného skillu si môžu vyžiadať potvrdenie pokračovania. Výskumné skilly spravidla vytvárajú samostatný report a pôvodný obsah počas analýzy nemenia.
+
+Pri citlivých operáciách, ako je prepísanie súboru alebo nezvratná úprava obrázka, si príslušný skill vyžiada potvrdenie. Automatické vykonanie Git commitu sa v obsahových skilloch nepoužíva.
 
 ## Dokumentácia
 
